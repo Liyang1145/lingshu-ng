@@ -1,0 +1,42 @@
+# lingshu-ng 运维手册
+
+只写本仓已实现的行为；细节见 ENTERPRISE.md。
+
+## 1. 监控
+- 健康：`GET /v1/health`（含 `rejected_busy`）。
+- 指标：`GET /metrics`（Prometheus 文本，需 Bearer 令牌）。抓取示例：
+```yaml
+scrape_configs:
+  - job_name: lingshu-ng
+    metrics_path: /metrics
+    authorization: {credentials_file: /etc/prometheus/lingshu.token}
+    static_configs: [{targets: ["127.0.0.1:8765"]}]
+```
+- 日志：`LINGSHU_NG_LOG_FORMAT=json` 便于采集。
+- 一键自检：`lingshu-ng doctor`（JSON 输出，有问题时退出码非零，可挂到定时探活）。
+
+## 2. 备份
+```cron
+0 3 * * * lingshu-ng backup --db /var/lib/lingshu/data.db /backup/data-$(date +\%F).db && find /backup -name 'data-*.db' -mtime +14 -delete
+```
+在线备份不停服务。恢复须先停服务：`lingshu-ng restore --db data.db <快照> --force`。建议定期在测试机演练恢复。
+
+## 3. 令牌轮换（免重启）
+1. 在 `LINGSHU_NG_TOKEN_FILE` 指向的文件追加新令牌（每行一个）。
+2. 客户端切换到新令牌。
+3. 删除旧令牌行即吊销。文件读出为空时拒绝所有请求（失败关闭）。
+
+## 4. 升级与回滚
+- 升级前：`lingshu-ng backup`，再 `pip install -U lingshu-ng`，重启后跑 `lingshu-ng doctor`。
+- 回滚：停服务，`pip install lingshu-ng==<旧版本>`，用升级前的备份 `restore`（新 schema 的库旧版本可能拒绝打开，所以要用备份）。
+- 发行物校验：Release 对应 CI 产物含 SHA256SUMS 与 SBOM；两次构建在固定 `SOURCE_DATE_EPOCH` 下字节一致（`python tools/release/repro_check.py`）。
+
+## 5. 故障排查
+| 现象 | 排查 |
+|---|---|
+| 503 + Retry-After | 并发满；调大 `LINGSHU_NG_MAX_CONN`（缺省 64）或限流上游；看 `http_rejected_busy_total` |
+| 全部 401/拒绝 | 令牌错误，或令牌文件为空/读失败（失败关闭）；检查文件权限 |
+| 启动退出码 2 | 环境变量取值非法（如 `LINGSHU_NG_LOG_FORMAT`），看启动报错 |
+| 库打不开/报 schema | 版本不匹配；`lingshu-ng doctor`，必要时回滚并 restore |
+| /metrics 401 | 抓取端未带令牌 |
+| 磁盘紧张 | doctor 报告余量；清旧备份 |
