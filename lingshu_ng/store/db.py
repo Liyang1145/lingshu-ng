@@ -80,6 +80,13 @@ class Database:
             except OSError as e:
                 raise DatabaseOpenError(f"无法创建库所在目录 {parent}：{e.strerror or e}。"
                                         "请换一个可写的路径，或先建好该目录并授予写权限") from e
+        if path not in (":memory:", "") and not os.path.exists(path):
+            try:   # sec-r1：新建库仅属主可读写（-wal / -shm 由 SQLite 按库文件权限创建）；已有文件不动
+                os.close(os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600))
+            except FileExistsError:
+                pass
+            except OSError:   # 不可写等：交给下面的 sqlite3.connect 报出带改法的 DatabaseOpenError
+                pass
         try:
             self.conn = sqlite3.connect(path, check_same_thread=False, timeout=timeout,
                                         isolation_level=None)
