@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>lingshu-ng 控制台</title>
+<link rel="stylesheet" href="/console/app.css">
+<script src="/console/app.js" defer></script>
+</head>
+<body>
+<header class="top">
+  <div class="brand"><span class="logo">灵枢</span><span class="name">lingshu-ng</span> <span class="sub" data-i18n="console">控制台</span></div>
+  <nav id="tabs" class="tabs" aria-label="sections">
+    <button type="button" data-view="overview" data-i18n="tab_overview">概览</button>
+    <button type="button" data-view="search" data-i18n="tab_search">检索</button>
+    <button type="button" data-view="browse" data-i18n="tab_browse">记忆浏览</button>
+    <button type="button" data-view="write" data-i18n="tab_write">写入</button>
+    <button type="button" data-view="exchange" data-i18n="tab_exchange">导入/导出</button>
+    <button type="button" data-view="health" data-i18n="tab_health">健康</button>
+  </nav>
+  <div class="tools">
+    <button type="button" id="lang" class="ghost" title="中文 / English">EN</button>
+    <button type="button" id="logout" class="ghost hidden" data-i18n="logout">退出</button>
+  </div>
+</header>
+<main id="main">
+  <section id="login" class="card hidden">
+    <h2 data-i18n="login_title">需要令牌</h2>
+    <p class="muted" data-i18n="login_hint">此服务设置了 Bearer 令牌。令牌只保存在本标签页的 sessionStorage 中，关闭标签页即清除。</p>
+    <form id="login-form" autocomplete="off">
+      <label for="token-input" data-i18n="token">令牌</label>
+      <input id="token-input" type="password" autocomplete="off" spellcheck="false" required>
+      <button type="submit" class="primary" data-i18n="login">登录</button>
+      <p id="login-error" class="error" role="alert"></p>
+    </form>
+  </section>
+  <section id="view" aria-live="polite"></section>
+</main>
+<div id="modal" class="modal hidden" role="dialog" aria-modal="true">
+  <div class="modal-box">
+    <div class="modal-head"><h2 id="modal-title"></h2><button type="button" id="modal-close" class="ghost" aria-label="close">×</button></div>
+    <div id="modal-body"></div>
+  </div>
+</div>
+<div id="toast" class="toast hidden" role="status"></div>
+<noscript>需要启用 JavaScript / JavaScript is required.</noscript>
+</body>
+</html>

@@ -36,6 +36,10 @@ Origin = "https://github.com/TanPowasd/LingShu-prime/tree/main/Liyang"
 [tool.setuptools.dynamic]
 version = { attr = "lingshu_ng.__version__" }
 
+[tool.setuptools.package-data]
+# ent-ui：控制台静态资源（lingshu_ng.integrations.console 经 importlib.resources 读取）
+"lingshu_ng.integrations" = ["console_static/*.html", "console_static/*.js", "console_static/*.css"]
+
 [tool.setuptools.packages.find]
 include = ["lingshu_ng", "lingshu_ng.*"]
 exclude = ["lingshu_ng.*.__pycache__"]
