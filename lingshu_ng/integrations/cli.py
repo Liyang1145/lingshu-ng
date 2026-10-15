@@ -91,7 +91,11 @@ def main(argv: Optional[List[str]] = None) -> int:
     svc = Service(db)
     try:
         if a.cmd == "perceive":
-            _print(svc.perceive({"content": a.text, **({"tags": a.tag} if a.tag else {})}))
+            body = {"content": a.text, **({"tags": a.tag} if a.tag else {})}
+            out = svc.perceive(body)
+            from .mcp import _audit_write
+            _audit_write("perceive", "cli", body, out, 200, None)
+            _print(out)
         elif a.cmd == "recall":
             _print(svc.recall({"query": a.query, "limit": a.limit}))
         else:

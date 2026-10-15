@@ -94,3 +94,47 @@ def test_explicit_token_plus_file(mk, tmp_path, monkeypatch):
     port = s.server_address[1]
     for t, want in (("cli-tok", 200), ("file-tok", 200), ("x", 401)):
         assert _status(port, {"Authorization": f"Bearer {t}"})[0] == want
+
+
+def test_export_streams_valid_json_without_full_parse(mk, monkeypatch):
+    import json
+    from lingshu_ng.integrations import service as svc_mod
+    s = mk()
+    port = s.server_address[1]
+    for i in range(200):
+        s.service.perceive({"content": f"流式导出第{i}条 " + "字" * 300, "skip_dedup": True})
+    monkeypatch.setattr(lhttp, "EXPORT_CHUNK", 4096)
+    called = []
+    monkeypatch.setattr(svc_mod.Service, "export_backup", lambda self, b=None: called.append(1) or {})   # HTTP 不再走整份解析
+    c = http.client.HTTPConnection("127.0.0.1", port, timeout=20)
+    c.request("GET", "/v1/export")
+    r = c.getresponse()
+    raw = r.read()
+    c.close()
+    assert r.status == 200 and int(r.getheader("Content-Length")) == len(raw) > 60000
+    d = json.loads(raw)
+    assert d["report"]["exported_nodes"] == 200 and len(d["backup"]["nodes"]) == 200 and "path" not in d["report"]
+    assert not called
+
+
+def test_mcp_and_cli_writes_are_audited(tmp_path, monkeypatch, caplog):
+    import json, logging
+    from lingshu_ng.integrations.mcp import McpServer
+    from lingshu_ng.integrations.service import Service
+    from lingshu_ng.integrations.cli import main
+    monkeypatch.setenv("LINGSHU_NG_SEM", "off")
+    caplog.set_level(logging.INFO, logger="lingshu_ng.audit")
+    secret = "审计不应含此正文-K9"
+    svc = Service(str(tmp_path / "m.db"))
+    try:
+        m = McpServer(svc)
+        m.dispatch("tools/call", {"name": "lingshu_perceive", "arguments": {"content": secret}})
+        m.dispatch("tools/call", {"name": "lingshu_perceive", "arguments": {"content": 5}})
+        m.dispatch("tools/call", {"name": "lingshu_recall", "arguments": {"query": secret}})
+    finally:
+        svc.close()
+    assert main(["perceive", "--db", str(tmp_path / "c.db"), secret + "cli"]) == 0
+    lines = [json.loads(r.getMessage()) for r in caplog.records if r.name == "lingshu_ng.audit"]
+    assert [(x["op"], x["remote"], x["status"]) for x in lines] == [
+        ("perceive", "mcp", 200), ("perceive", "mcp", 400), ("perceive", "cli", 200)]
+    assert all(secret not in r.getMessage() for r in caplog.records if r.name == "lingshu_ng.audit")

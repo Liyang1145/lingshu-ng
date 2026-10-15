@@ -47,6 +47,20 @@ TOOLS = [
      "inputSchema": {"type": "object", "additionalProperties": False, "properties": {}}},
 ]
 assert set(TOOLS[0]["inputSchema"]["properties"]) == set(PERCEIVE_FIELDS)
+def _audit_write(op, channel, body, out, status, error) -> None:
+    """E5-4：MCP 通道的写操作同样记审计（字段同 HTTP，不含正文）；审计失败不影响调用。"""
+    from .http import _AUDITED, _audit_fields, audit
+    if op not in _AUDITED:
+        return
+    try:
+        f = _audit_fields(op, body, out)
+        if error:
+            f["error"] = error
+        audit(op, channel, status, **f)
+    except Exception:  # noqa: BLE001
+        logging.getLogger(__name__).exception("审计日志写入失败")
+
+
 _TOOL_OP = {"lingshu_perceive": "perceive", "lingshu_recall": "recall", "lingshu_status": "status",
             "lingshu_capabilities": "capabilities"}
 
@@ -77,10 +91,13 @@ class McpServer:
         name, args = params.get("name"), params.get("arguments") or {}
         if not isinstance(name, str) or name not in _TOOL_OP:
             raise RpcError(-32602, f"未知工具 {name!r}")
+        op = _TOOL_OP[name]
         try:
-            out = getattr(self.service, _TOOL_OP[name])(args)
+            out = getattr(self.service, op)(args)
         except (BadRequest, TypeError, ValueError) as e:
+            _audit_write(op, "mcp", args, None, 400, type(e).__name__)
             return {"content": [{"type": "text", "text": f"{type(e).__name__}: {e}"}], "isError": True}
+        _audit_write(op, "mcp", args, out, 200, None)
         text = json.dumps(out, ensure_ascii=False, default=str)
         return {"content": [{"type": "text", "text": text}], "structuredContent": json.loads(text), "isError": False}
 

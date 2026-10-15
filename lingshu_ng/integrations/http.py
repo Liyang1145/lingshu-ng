@@ -68,6 +68,8 @@ _GET = {"/v1/status": "status", "/v1/capabilities": "capabilities", "/v1/nodes":
 _POST = {"/v1/perceive": "perceive", "/v1/recall": "recall", "/v1/import": "import_backup"}
 #: ent-ui：导入请求体上限（字节；整份备份走一次请求，比普通请求宽）
 MAX_IMPORT_BODY = 32 << 20
+#: E5-2：流式导出每块字节数
+EXPORT_CHUNK = 1 << 16
 #: ent-ui：额外的 CSRF 防护头。浏览器跨站请求带自定义头必须先过 CORS 预检，本服务不应答预检（501），跨站页面就发不出
 CONSOLE_HEADER = "X-Lingshu-Console"
 #: 任何模式下都要求 :data:`CONSOLE_HEADER` 的破坏性操作；控制台模式下所有非 GET 请求都要求
@@ -282,6 +284,40 @@ class _Handler(BaseHTTPRequestHandler):
             return self._err(code, msg)
         self._send(200, out)
 
+    def _export_stream(self) -> None:
+        """E5-2：整库导出走临时文件逐块写出，响应形状仍是 ``{"report": {...}, "backup": <备份>}``，
+        但不把整份备份解析进内存（大库导出内存占用 ≈ 一个块，而不是整库 JSON 的数倍）。"""
+        import shutil
+        import tempfile
+        svc = self.server.service
+        d = tempfile.mkdtemp(prefix="lingshu-ng-export-")
+        try:
+            path = os.path.join(d, "backup.json")
+            try:
+                with svc.lock:
+                    rep = svc.engine.export_all(path)
+            except Exception as e:
+                _log.exception("导出内部错误")
+                return self._err(500, f"内部错误 {type(e).__name__}（详情见服务端日志）")
+            rep = {k: v for k, v in rep.items() if k != "path"}
+            head = ('{"report": ' + json.dumps(rep, ensure_ascii=False, default=str) + ', "backup": ').encode("utf-8")
+            size = os.path.getsize(path)
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Content-Length", str(len(head) + size + 1))
+            self._security_headers(API_CSP)
+            self.end_headers()
+            self.wfile.write(head)
+            with open(path, "rb") as f:
+                while True:
+                    chunk = f.read(EXPORT_CHUNK)
+                    if not chunk:
+                        break
+                    self.wfile.write(chunk)
+            self.wfile.write(b"}")
+        finally:
+            shutil.rmtree(d, ignore_errors=True)
+
     def _audit(self, op, body, out, code, error) -> None:
         try:
             f = _audit_fields(op, body, out)
@@ -326,6 +362,8 @@ class _Handler(BaseHTTPRequestHandler):
             return self._err(405, "该路径只接受 POST")
         if path not in _GET:
             return self._err(404, f"未知路径 {path}")
+        if _GET[path] == "export_backup" and "?" not in self.path:
+            return self._export_stream()
         if _GET[path] == "list_nodes":
             try:
                 return self._run("list_nodes", self._query())
