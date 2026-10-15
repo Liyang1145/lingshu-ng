@@ -21,7 +21,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import logging
 import os
 import sys
 from typing import List, Optional
@@ -70,8 +69,12 @@ def _print(obj) -> None:
 def main(argv: Optional[List[str]] = None) -> int:
     """解析参数并执行子命令，返回退出码。"""
     a = _parser().parse_args(argv)
-    logging.basicConfig(level=os.environ.get("LINGSHU_NG_LOG", "WARNING"), stream=sys.stderr,
-                        format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+    from ._logfmt import configure_logging
+    try:
+        configure_logging(sys.stderr)
+    except ValueError as e:
+        sys.stderr.write(f"lingshu-ng: {e}\n")
+        return 2
     if a.cmd == "version":
         from .. import __version__
         _print({"version": __version__})

@@ -8,6 +8,7 @@
     POST /v1/perceive        {"content": "...", 可选 tags/entities/importance/confidence/layer/skip_dedup}
     POST /v1/recall          {"query": "...", "limit": 10}
     GET  /healthz            {"ok": true}（不需鉴权，不碰库）
+    GET  /metrics            Prometheus 文本格式指标（需鉴权；E6-2）
 
 ent-ui 新增（docs/CONSOLE.md）::
 
@@ -200,6 +201,26 @@ class _Handler(BaseHTTPRequestHandler):
         h = getattr(self.server, "_health_info", None)
         return self._send(200, h() if h else {"ok": True})
 
+    def send_response(self, code, message=None):  # E6-2：按状态码计数
+        cnt = getattr(self.server, "_count_response", None)
+        if cnt is not None:
+            cnt(code)
+        super().send_response(code, message)
+
+    def _metrics(self) -> None:
+        """E6-2：Prometheus 文本格式（0.0.4）指标；只含计数，不含记忆正文。"""
+        try:
+            data = self.server._metrics_text().encode("utf-8")
+        except Exception:
+            _log.exception("生成 /metrics 失败")
+            return self._err(500, "内部错误（详情见服务端日志）")
+        self.send_response(200)
+        self.send_header("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
+        self.send_header("Content-Length", str(len(data)))
+        self._security_headers(API_CSP)
+        self.end_headers()
+        self.wfile.write(data)
+
     def _err(self, code: int, msg: str) -> None:
         self._send(code, {"error": {"code": code, "message": msg}})
 
@@ -355,6 +376,8 @@ class _Handler(BaseHTTPRequestHandler):
             return None
         if path == "/v1/health":
             return self._health()
+        if path == "/metrics":
+            return self._metrics()
         m = _NODE_PATH.match(path)
         if m:
             return self._run("get_node", {"id": unquote(m.group(1))})
@@ -398,7 +421,7 @@ class _Handler(BaseHTTPRequestHandler):
         path = self.path.split("?", 1)[0]
         if not self._guard() or not self._authorized():
             return None
-        if path in _GET or _NODE_PATH.match(path) or path == "/v1/health":
+        if path in _GET or _NODE_PATH.match(path) or path in ("/v1/health", "/metrics"):
             return self._err(405, "该路径不接受 POST")
         if path not in _POST:
             return self._err(404, f"未知路径 {path}")
@@ -442,6 +465,7 @@ class Server(ThreadingHTTPServer):
         self.console = False
         self.started_at, self._t0 = time.time(), time.monotonic()
         self.requests_total, self._recent, self._stat_lock = 0, deque(maxlen=100_000), threading.Lock()
+        self._responses = {}             # E6-2：状态码 → 次数（/metrics）
         super().__init__((host, port), _Handler)
 
     # ------------------------------------------------------------ E5-3 令牌文件
@@ -507,6 +531,39 @@ class Server(ThreadingHTTPServer):
             self.requests_total += 1
             self._recent.append(t)
 
+    def _count_response(self, code) -> None:
+        with self._stat_lock:
+            self._responses[int(code)] = self._responses.get(int(code), 0) + 1
+
+    def _metrics_text(self) -> str:
+        """E6-2：``GET /metrics`` 正文（Prometheus 文本格式）。"""
+        from .. import __version__
+        with self._stat_lock:
+            total, resp = self.requests_total, dict(self._responses)
+        st = self.service.status()
+        out = []
+
+        def metric(name, typ, help_, samples):
+            out.append(f"# HELP {name} {help_}")
+            out.append(f"# TYPE {name} {typ}")
+            for labels, v in samples:
+                lab = "{" + ",".join(f'{k}="{_prom_escape(x)}"' for k, x in labels) + "}" if labels else ""
+                out.append(f"{name}{lab} {v}")
+        metric("lingshu_ng_info", "gauge", "Build info.", [((("version", __version__),), 1)])
+        metric("lingshu_ng_uptime_seconds", "gauge", "Seconds since server start.",
+               [((), round(time.monotonic() - self._t0, 3))])
+        metric("lingshu_ng_http_requests_total", "counter", "HTTP requests handled.", [((), total)])
+        metric("lingshu_ng_http_responses_total", "counter", "HTTP responses by status code.",
+               [((("code", str(c)),), n) for c, n in sorted(resp.items())])
+        metric("lingshu_ng_http_rejected_busy_total", "counter", "Connections rejected with 503 (connection cap).",
+               [((), self.rejected_busy)])
+        metric("lingshu_ng_http_max_connections", "gauge", "Configured connection cap.", [((), self.max_conn)])
+        metric("lingshu_ng_memory_nodes", "gauge", "Memory nodes in the store.", [((), st["total"])])
+        metric("lingshu_ng_memory_nodes_by_layer", "gauge", "Memory nodes by layer.",
+               [((("layer", k),), v) for k, v in sorted(st["counts"].items())])
+        metric("lingshu_ng_schema_version", "gauge", "Store schema version.", [((), st["schema_version"] or 0)])
+        return "\n".join(out) + "\n"
+
     def _health_info(self) -> dict:
         """``/v1/health``：版本、运行时长、请求计数（总数 / 最近 :data:`RECENT_WINDOW` 秒）。"""
         from .. import __version__
@@ -520,6 +577,10 @@ class Server(ThreadingHTTPServer):
                 "requests_recent": recent, "recent_window_s": RECENT_WINDOW, "console": bool(self.console),
                 "auth": "token" if self.token else "loopback-only", "max_conn": self.max_conn,
                 "rejected_busy": self.rejected_busy}
+
+
+def _prom_escape(v) -> str:
+    return str(v).replace("\\", "\\\\").replace("\n", "\\n").replace('"', '\\"')
 
 
 def make_server(db: str = ":memory:", host: str = "127.0.0.1", port: int = 8765,

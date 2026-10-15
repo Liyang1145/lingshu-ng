@@ -53,6 +53,8 @@ docker run -d --name lingshu -p 127.0.0.1:8765:8765 -v lingshu-data:/data \
 
 - 健康检查：`GET /healthz`（免鉴权）。镜像自带 HEALTHCHECK。
 - 日志：标准 `logging`，logger 前缀 `lingshu_ng`；`LINGSHU_NG_LOG=DEBUG` 也不会打印记忆原文或令牌。
+- 结构化日志：`LINGSHU_NG_LOG_FORMAT=json` 时每行一个 JSON（`ts`/`level`/`logger`/`msg`，异常带 `exc`），缺省 `text`；非法值启动即报错退出（退出码 2）。
+- 指标：`GET /metrics`（Prometheus 文本格式 0.0.4，**需同样的 Bearer 令牌**）：`lingshu_ng_info`、`uptime_seconds`、`http_requests_total`、`http_responses_total{code}`、`http_rejected_busy_total`、`http_max_connections`、`memory_nodes`、`memory_nodes_by_layer{layer}`、`schema_version`。只含计数，不含记忆正文。Prometheus 抓取需配 `authorization: {credentials: <令牌>}`。
 - 能力自检：`GET /v1/capabilities` 或 `engine.capabilities()`，列出哪些可选件启用 / 为什么退回。
 - 备份（不停机）：`lingshu-ng backup --db data.db /backup/data-20261016.db`——SQLite 在线备份 API 拷贝，
   快照跑 `integrity_check`，旁边写 `*.manifest.json`（版本、行数、SHA-256）。适合放进 cron。

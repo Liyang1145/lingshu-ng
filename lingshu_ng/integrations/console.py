@@ -109,8 +109,12 @@ def main(argv: Optional[List[str]] = None) -> int:
     ap = argparse.ArgumentParser(prog="lingshu-ng console", description="灵枢 lingshu_ng 本机 Web 控制台")
     add_arguments(ap)
     a = ap.parse_args(argv)
-    logging.basicConfig(level=os.environ.get("LINGSHU_NG_LOG", "WARNING"), stream=sys.stderr,
-                        format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+    from ._logfmt import configure_logging
+    try:
+        configure_logging(sys.stderr)
+    except ValueError as e:
+        sys.stderr.write(f"lingshu-ng: {e}\n")
+        return 2
     return run(a)
 
 
