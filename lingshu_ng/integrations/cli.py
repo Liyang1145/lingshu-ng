@@ -10,6 +10,8 @@
     recall        --db PATH QUERY [--limit 10]                             召回，打印 JSON
     status        --db PATH                                                库状态
     capabilities  [--db PATH]                                              当前生效档位
+    backup        --db PATH DEST [--force]                                 在线快照 + integrity_check + SHA-256 清单
+    restore       --db PATH SNAPSHOT [--force]                             校验快照后原子替换库（先停服务；旧库自动另存）
     version                                                                打印版本号
 
 ``--db`` 缺省读环境变量 ``LINGSHU_NG_DB``，都没有时 ``serve`` / ``mcp`` 拒绝启动（避免把数据写进进程内存后丢失），
@@ -51,6 +53,12 @@ def _parser() -> argparse.ArgumentParser:
     p.add_argument("--limit", type=int, default=10)
     add("status", "库状态")
     add("capabilities", "当前生效档位")
+    p = add("backup", "在线快照整库（SQLite 备份 API，不停机）")
+    p.add_argument("dest")
+    p.add_argument("--force", action="store_true", help="覆盖已存在的目标")
+    p = add("restore", "从快照恢复（先停服务）")
+    p.add_argument("snapshot")
+    p.add_argument("--force", action="store_true", help="目标库已存在时覆盖（旧库自动另存为 .pre-restore-时间戳）")
     add("version", "版本号", db=False)
     return ap
 
@@ -86,6 +94,18 @@ def main(argv: Optional[List[str]] = None) -> int:
     if a.cmd == "mcp":
         from .mcp import run_stdio
         run_stdio(db)
+        return 0
+    if a.cmd in ("backup", "restore"):
+        from . import backup as bk
+        from .http import audit
+        try:
+            out = bk.backup(db, a.dest, force=a.force) if a.cmd == "backup" else bk.restore(a.snapshot, db, force=a.force)
+        except bk.BackupError as e:
+            audit(a.cmd, "cli", 400, error="BackupError")
+            sys.stderr.write(f"{e}\n")
+            return 1
+        audit(a.cmd, "cli", 200, nodes=out["counts"]["nodes"])
+        _print(out)
         return 0
     from .service import BadRequest, Service
     svc = Service(db)
