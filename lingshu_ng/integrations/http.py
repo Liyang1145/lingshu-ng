@@ -56,6 +56,11 @@ MAX_BODY = 1 << 20
 #: 超限请求体在回 413 之前最多读掉（丢弃）这么多字节，客户端才能读到 413 而不是写到一半被断开（Broken pipe）；更大的直接断开
 _DRAIN_CAP = 4 * MAX_BODY
 TOKEN_ENV = "LINGSHU_NG_TOKEN"
+#: E5-3：令牌文件（每行一个有效令牌，# 开头为注释）；按 mtime 变化自动重读，新旧令牌可并存过渡，轮换无需重启
+TOKEN_FILE_ENV = "LINGSHU_NG_TOKEN_FILE"
+#: E5-1：同时处理的连接上限（满则直接回 503 + Retry-After，不再开线程）；环境变量 LINGSHU_NG_MAX_CONN 覆盖
+MAX_CONN_ENV = "LINGSHU_NG_MAX_CONN"
+DEFAULT_MAX_CONN = 64
 #: 每连接读超时（秒）：请求行 / 头 / 正文迟迟不到就断开，慢速连接不会无限占住线程（sec-r1）
 REQUEST_TIMEOUT = 30.0
 _GET = {"/v1/status": "status", "/v1/capabilities": "capabilities", "/v1/nodes": "list_nodes",
@@ -197,12 +202,19 @@ class _Handler(BaseHTTPRequestHandler):
         self._send(code, {"error": {"code": code, "message": msg}})
 
     def _authorized(self) -> bool:
-        token = self.server.token
-        if not token:
+        tokens = self.server.valid_tokens()
+        if not tokens:
+            if self.server.token_file:            # 配了令牌文件却读出空集：失败关闭，不退化为无鉴权
+                self._err(401, "令牌文件为空或不可读，拒绝所有请求")
+                return False
             return True
         got = self.headers.get("Authorization", "")
         scheme, _, cred = got.partition(" ")   # RFC 7235：认证方案名大小写不敏感（sec-r2 O8）
-        ok = scheme.lower() == "bearer" and hmac.compare_digest(cred.strip().encode(), token.encode())
+        c = cred.strip().encode()
+        ok = False
+        for t in tokens:                       # 逐个常数时间比较，不提前退出
+            ok |= hmac.compare_digest(c, t.encode())
+        ok = ok and scheme.lower() == "bearer"
         if not ok:
             self._err(401, "缺少或错误的 Authorization: Bearer 令牌")
         return ok
@@ -371,9 +383,21 @@ class Server(ThreadingHTTPServer):
     daemon_threads = True
 
     def __init__(self, service: Service, host: str = "127.0.0.1", port: int = 8765, token: Optional[str] = None):
-        if not is_loopback(host) and not token:
-            raise PermissionError(f"绑定非回环地址 {host} 必须设置令牌（--token 或 {TOKEN_ENV}）")
-        self.service, self.token = service, token or None
+        self.token_file = os.environ.get(TOKEN_FILE_ENV) or None
+        self._tok_lock, self._tok_mtime, self._file_tokens = threading.Lock(), None, ()
+        self._explicit_token = token or None
+        if self.token_file:
+            self._reload_tokens(force=True)
+        if not is_loopback(host) and not (token or self._file_tokens):
+            raise PermissionError(f"绑定非回环地址 {host} 必须设置令牌（--token、{TOKEN_ENV} 或 {TOKEN_FILE_ENV}）")
+        self.service = service
+        self.token = token or (self._file_tokens[0] if self._file_tokens else None) or (self.token_file and "<file>")
+        try:
+            self.max_conn = max(1, int(os.environ.get(MAX_CONN_ENV) or DEFAULT_MAX_CONN))
+        except ValueError:
+            raise ValueError(f"{MAX_CONN_ENV} 必须是正整数") from None
+        self._conn_sem = threading.BoundedSemaphore(self.max_conn)
+        self.rejected_busy = 0
         self.loopback_only = is_loopback(host)
         self.request_queue_size = 128   # listen 积压（socketserver 缺省 5，突发并发下被内核 RST；sec-r1）
         # ent-ui：控制台开关与请求计数（实例属性，不扩大公开 API 快照）
@@ -381,6 +405,62 @@ class Server(ThreadingHTTPServer):
         self.started_at, self._t0 = time.time(), time.monotonic()
         self.requests_total, self._recent, self._stat_lock = 0, deque(maxlen=100_000), threading.Lock()
         super().__init__((host, port), _Handler)
+
+    # ------------------------------------------------------------ E5-3 令牌文件
+    def _reload_tokens(self, force: bool = False) -> None:
+        try:
+            m = os.stat(self.token_file).st_mtime_ns
+        except OSError:
+            if force:
+                raise PermissionError(f"{TOKEN_FILE_ENV}={self.token_file!r} 不可读") from None
+            _log.warning("令牌文件 %s 不可读，沿用上次加载的令牌", self.token_file)
+            return
+        if not force and m == self._tok_mtime:
+            return
+        try:
+            with open(self.token_file, encoding="utf-8") as f:
+                toks = tuple(x.strip() for x in f if x.strip() and not x.lstrip().startswith("#"))
+        except (OSError, UnicodeDecodeError):
+            _log.warning("令牌文件 %s 读取失败，沿用上次加载的令牌", self.token_file, exc_info=True)
+            return
+        self._file_tokens, self._tok_mtime = toks, m
+        _log.info("已加载令牌文件：%d 个有效令牌", len(toks))
+
+    def valid_tokens(self) -> tuple:
+        """当前有效令牌：显式令牌（--token / 环境变量）+ 令牌文件里的全部（文件变动即时生效）。"""
+        if self.token_file:
+            with self._tok_lock:
+                self._reload_tokens()
+            return tuple(t for t in ((self._explicit_token,) if self._explicit_token else ()) + self._file_tokens)
+        return (self.token,) if self.token else ()
+
+    # ------------------------------------------------------------ E5-1 并发连接上限
+    def process_request(self, request, client_address):
+        """连接数满时不开线程，直接回 503（Retry-After: 1）并关闭。"""
+        if not self._conn_sem.acquire(blocking=False):
+            self.rejected_busy += 1
+            try:
+                body = json.dumps({"error": {"code": 503, "message": f"服务繁忙：并发连接已达上限 {self.max_conn}"}},
+                                  ensure_ascii=False).encode("utf-8")
+                request.sendall(b"HTTP/1.1 503 Service Unavailable\r\nContent-Type: application/json; charset=utf-8\r\n"
+                                b"Retry-After: 1\r\nConnection: close\r\nContent-Length: " + str(len(body)).encode()
+                                + b"\r\n\r\n" + body)
+            except OSError:
+                _log.debug("回 503 时连接已断", exc_info=True)
+            self.shutdown_request(request)
+            return
+        try:
+            super().process_request(request, client_address)
+        except BaseException:
+            self._conn_sem.release()
+            raise
+
+    def process_request_thread(self, request, client_address):
+        """处理完一个连接后释放并发名额。"""
+        try:
+            super().process_request_thread(request, client_address)
+        finally:
+            self._conn_sem.release()
 
     def _count_request(self) -> None:
         """计一次请求（ent-ui 健康页用）。"""
@@ -400,7 +480,8 @@ class Server(ThreadingHTTPServer):
         return {"ok": True, "version": __version__, "started_at": self.started_at,
                 "uptime_s": round(t - self._t0, 3), "requests_total": total,
                 "requests_recent": recent, "recent_window_s": RECENT_WINDOW, "console": bool(self.console),
-                "auth": "token" if self.token else "loopback-only"}
+                "auth": "token" if self.token else "loopback-only", "max_conn": self.max_conn,
+                "rejected_busy": self.rejected_busy}
 
 
 def make_server(db: str = ":memory:", host: str = "127.0.0.1", port: int = 8765,

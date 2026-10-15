@@ -20,7 +20,7 @@ import os
 import sys
 from typing import List, Optional
 
-from .http import TOKEN_ENV, Server
+from .http import TOKEN_ENV, TOKEN_FILE_ENV, Server
 from .service import Service
 
 _log = logging.getLogger("lingshu_ng.integrations.console")
@@ -42,7 +42,7 @@ def make_console_server(db: str = ":memory:", host: str = "127.0.0.1", port: int
     """建控制台服务（不启动）。``token`` 缺省读 ``LINGSHU_NG_TOKEN``；``port=0`` 由系统分配端口。"""
     if token is None:
         token = os.environ.get(TOKEN_ENV) or None
-    if not token and not _loopback(host):
+    if not token and not os.environ.get(TOKEN_FILE_ENV) and not _loopback(host):
         # 先于打开库拒绝，避免为一次失败的启动建库文件
         raise PermissionError(f"绑定非回环地址 {host} 必须设置令牌（--token 或 {TOKEN_ENV}）")
     return ConsoleServer(service or Service(db), host, port, token)
