@@ -122,4 +122,4 @@ perf_bench 各次：1k A 81.2 / 83.1 / 82.2 / 81.2、B 77.5 / 77.4 / 77.5 / 77.5
 - HTTP 新路由：`GET /v1/health`、`GET /v1/nodes`、`GET|DELETE /v1/nodes/<id>`、`GET /v1/export`、`POST /v1/import`。`DELETE /v1/nodes/<id>` 与 `POST /v1/import` 在任何模式下都须带 `X-Lingshu-Console: 1`；控制台模式下所有非 GET 请求都须带。既有 `/v1/perceive`、`/v1/recall`、`/v1/status`、`/v1/capabilities`、`/healthz` 行为不变（JSON 响应多了 `Content-Security-Policy`、`X-Content-Type-Options` 等安全头）。
 - 审计：perceive / delete / import 每次（含被拒的）记一行 JSON 到 logger `lingshu_ng.audit`（INFO），含时间、操作、节点 id、来源地址、状态码，不含记忆正文。
 - `NodeRepo.page`（内部）：分页 + 层 / 标签过滤。
-- 测试：`tests_ng/test_console.py`（30 例）。
+- 测试：`tests_ng/test_console.py`（31 例）。

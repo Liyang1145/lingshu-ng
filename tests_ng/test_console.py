@@ -336,6 +336,15 @@ def test_delete_protected_node_conflict(srv):
     assert _json(port, "GET", f"/v1/nodes/{a}")[1]["protected"] is True
 
 
+def test_delete_shared_layer_conflict(srv):
+    port = srv()
+    from lingshu_ng.types import MemoryLayer
+    w = srv.last.service.engine.add_shared(MemoryLayer.ANCHOR, "锚点不可删", 0.9)
+    st, r = _json(port, "DELETE", f"/v1/nodes/{w.node_id}")
+    assert st == 409 and "anchor" in r["error"]["message"]
+    assert _json(port, "GET", f"/v1/nodes/{w.node_id}")[1]["deletable"] is False
+
+
 def test_export_import_round_trip(srv):
     port = srv()
     a = _put(port, "导出测试一", tags=["x"])
@@ -467,7 +476,8 @@ def test_entry_points(monkeypatch):
 
 
 def test_console_assets_declared_as_package_data():
-    cfg = tomllib.load(open(os.path.join(ROOT, "pyproject.toml"), "rb"))
+    with open(os.path.join(ROOT, "pyproject.toml"), "rb") as f:
+        cfg = tomllib.load(f)
     pats = cfg["tool"]["setuptools"]["package-data"]["lingshu_ng.integrations"]
     import fnmatch
     for name in ("index.html", "app.js", "app.css"):

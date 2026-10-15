@@ -106,6 +106,18 @@ pip install ./plugins/lingshu-ng-world ./plugins/lingshu-ng-nn ./plugins/lingshu
 
 API 用法见 [`docs/API_ng.md`](docs/API_ng.md)（安装、两个入口、兼容门面与不支持方法语义、capabilities、插件、异常、环境变量、存储并发与数据安全）。
 
+### 本机 Web 控制台（ent-ui）
+
+纯标准库、零外部资源的本地管理界面：概览、检索、记忆浏览（按层 / 标签分页）、写入、删除（二次确认）、导入 / 导出、健康。界面中英双语（缺省中文）。
+
+```bash
+lingshu-ng console --db ./mem.db                     # 打开 http://127.0.0.1:8766/
+lingshu-ng console --db ./mem.db --host 0.0.0.0 --token "$(openssl rand -hex 24)"   # 绑非回环必须给令牌
+python -m lingshu_ng.integrations.console --db ./mem.db --audit-log ./audit.jsonl
+```
+
+控制台与 `lingshu-ng serve` 是同一个 HTTP 服务（同一套 Host 白名单、Origin 校验、令牌、超时、请求体上限），另加 CSP、`X-Lingshu-Console` 头防 CSRF，写操作记 JSON 审计日志（不含正文）。启动、安全模型与 API 列表见 [`docs/CONSOLE.md`](docs/CONSOLE.md)。
+
 ```bash
 # 发行包（rel-v1.24 起拆包；包名 lingshu-ng 只含 lingshu_ng，零依赖）
 pip install lingshu-ng                 # 核心
