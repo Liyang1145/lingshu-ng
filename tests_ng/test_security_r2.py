@@ -43,3 +43,19 @@ def test_llm_url_policy(monkeypatch):
     assert le._url_ok("https://api.example.com/v1")
     assert le._url_ok("http://127.0.0.1:8000/v1") and le._url_ok("http://localhost/v1")
     assert not le._url_ok("http://api.example.com/v1") and not le._url_ok("ftp://x")
+
+
+def test_bearer_scheme_case_insensitive(tmp_path, monkeypatch):
+    import http.client, threading
+    from lingshu_ng.integrations import http as lhttp
+    monkeypatch.setenv("LINGSHU_NG_SEM", "off")
+    s = lhttp.make_server(str(tmp_path / "b.db"), "127.0.0.1", 0, "tok")
+    threading.Thread(target=s.serve_forever, daemon=True).start()
+    try:
+        for hdr, want in (("Bearer tok", 200), ("bearer tok", 200), ("BEARER tok", 200), ("Basic tok", 401), ("bearer bad", 401)):
+            c = http.client.HTTPConnection("127.0.0.1", s.server_address[1], timeout=10)
+            c.request("GET", "/v1/status", headers={"Authorization": hdr})
+            assert c.getresponse().status == want, hdr
+            c.close()
+    finally:
+        s.shutdown(); s.server_close(); s.service.close()

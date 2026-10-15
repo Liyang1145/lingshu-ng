@@ -201,7 +201,8 @@ class _Handler(BaseHTTPRequestHandler):
         if not token:
             return True
         got = self.headers.get("Authorization", "")
-        ok = got.startswith("Bearer ") and hmac.compare_digest(got[7:].encode(), token.encode())
+        scheme, _, cred = got.partition(" ")   # RFC 7235：认证方案名大小写不敏感（sec-r2 O8）
+        ok = scheme.lower() == "bearer" and hmac.compare_digest(cred.strip().encode(), token.encode())
         if not ok:
             self._err(401, "缺少或错误的 Authorization: Bearer 令牌")
         return ok
