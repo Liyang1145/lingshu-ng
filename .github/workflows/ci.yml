@@ -75,3 +75,22 @@ jobs:
       - run: python -m pip install pytest playwright
       - run: python -m playwright install --with-deps chromium
       - run: python -m pytest -q tests_e2e
+  release-artifacts:
+    # E6-1：构建核心 wheel/sdist，生成 CycloneDX SBOM 与 SHA256SUMS，作为 CI 产物可下载
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install build
+      - run: rm -rf dist && python -m build --outdir dist .
+      - run: python tools/release/sbom.py -o dist/lingshu-ng.cdx.json
+      - run: |
+          cd dist && python ../tools/release/checksums.py *.whl *.tar.gz lingshu-ng.cdx.json > SHA256SUMS
+          python ../tools/release/checksums.py --check SHA256SUMS
+          python ../tools/release/checksums.py --markdown *.whl *.tar.gz lingshu-ng.cdx.json >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: lingshu-ng-release
+          path: dist/

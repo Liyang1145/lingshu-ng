@@ -60,6 +60,7 @@ docker run -d --name lingshu -p 127.0.0.1:8765:8765 -v lingshu-data:/data \
   旧库自动另存为 `data.db.pre-restore-<时间戳>`，再原子替换。两个命令都写 `lingshu_ng.audit`（`remote=cli`）。
 - 逻辑备份（跨版本迁移）仍用 `/v1/export` / `/v1/import`。
 - 多进程同时写同一库：SQLite 写锁串行，未做压测承诺；高并发写请走单个服务进程。
+- 供应链：`python tools/release/sbom.py -o lingshu-ng.cdx.json` 生成 CycloneDX 1.5 SBOM（核心零第三方依赖，插件依赖以版本区间列出）；`python tools/release/checksums.py --check SHA256SUMS` 校验发布产物。CI 作业 `release-artifacts` 每次构建 wheel/sdist + SBOM + SHA256SUMS 并作为产物上传，Release 说明附校验和表。
 
 ## 6. 已知限制（如实列出）
 
