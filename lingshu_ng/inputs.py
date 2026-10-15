@@ -19,13 +19,16 @@ import operator
 import re
 from typing import Any, List, Optional
 
-__all__ = ["MAX_LIMIT", "MAX_QUERY_CHARS", "content", "query", "limit", "str_list"]
+__all__ = ["MAX_LIMIT", "MAX_QUERY_CHARS", "MAX_LIST_ITEMS", "MAX_ITEM_CHARS", "content", "query", "limit", "str_list"]
 
 #: recall / search 的 limit 上限（远大于任何实际请求；超出的部分不可能有结果）
 MAX_LIMIT = 100_000
 #: 查询文本只取前这么多字符（超长查询的检索耗时随长度增长，2 万字查询在百万字库上约 10 s；
 #: 现有各评测集的查询都远短于此）。截断时进程内打一次 WARNING 并登记 diag.fallbacks()["query_truncated"]
 MAX_QUERY_CHARS = 4096
+#: tags / entities 单次最多条数与单条最长字符（sec-r2，O3：防单请求写入数万标签放大存储与索引）
+MAX_LIST_ITEMS = 1000
+MAX_ITEM_CHARS = 1024
 
 _SURR = re.compile("[\ud800-\udfff]")
 
@@ -91,7 +94,11 @@ def str_list(x: Any, name: str) -> Optional[List[str]]:
         items = list(x)
     except TypeError:
         raise TypeError(f"{name} 应为字符串列表（收到 {type(x).__name__}）") from None
+    if len(items) > MAX_LIST_ITEMS:
+        raise ValueError(f"{name} 最多 {MAX_LIST_ITEMS} 项（收到 {len(items)}；lingshu_ng.inputs.MAX_LIST_ITEMS，未写入任何内容）")
     for i, t in enumerate(items):
+        if isinstance(t, str) and len(t) > MAX_ITEM_CHARS:
+            raise ValueError(f"{name}[{i}] 长 {len(t)} 字符，超过 {MAX_ITEM_CHARS}（未写入任何内容）")
         if isinstance(t, str) and _surrogate_at(t) >= 0:
             raise ValueError(f"{name}[{i}] 含孤立的 UTF-16 代理码位，无法保存（未写入任何内容）")
     return items

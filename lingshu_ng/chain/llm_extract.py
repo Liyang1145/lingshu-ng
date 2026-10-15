@@ -34,6 +34,15 @@ _log = logging.getLogger(__name__)
 ON = os.environ.get("LINGSHU_NG_CHAIN_LLM", "0").strip().lower() in ("1", "true", "yes", "on")
 MODEL = os.environ.get("LINGSHU_NG_CHAIN_LLM_MODEL", "cline-pass/deepseek-v4.1-flash")
 URL = os.environ.get("LINGSHU_NG_CHAIN_LLM_URL", "https://api.cline.bot/api/v1/chat/completions")
+
+
+def _url_ok(url: str) -> bool:
+    """只允许 https，或发往本机回环的 http（本地推理服务）。"""
+    from urllib.parse import urlsplit
+    u = urlsplit(url)
+    if u.scheme == "https":
+        return True
+    return u.scheme == "http" and (u.hostname or "") in ("127.0.0.1", "localhost", "::1")
 def _cache_home() -> str:
     """$XDG_CACHE_HOME（绝对路径时）否则 ~/.cache（与 semrank.cache_home 同规则）。"""
     x = os.environ.get("XDG_CACHE_HOME", "").strip()
@@ -144,6 +153,13 @@ def _call(sent: str) -> Optional[str]:
         with _lock:
             STATS["fail"] += 1
         return None
+    if not _url_ok(URL):
+        from .. import diag
+        diag.warn_once("chain_llm_insecure_url", f"LINGSHU_NG_CHAIN_LLM_URL={URL!r} 不是 https（且非本机），"
+                       "为免记忆原文与密钥明文外传，已拒绝发送（sec-r2 O5）")
+        with _lock:
+            STATS["fail"] += 1
+        return None
     key = os.environ.get("LINGSHU_NG_LLM_KEY") or os.environ.get("CLINE_API_KEY") or "x"
     for attempt in range(3):
         try:
@@ -163,7 +179,7 @@ def _call(sent: str) -> Optional[str]:
                 continue
             os.makedirs(os.path.dirname(p), exist_ok=True)
             tmp = f"{p}.{os.getpid()}.{threading.get_ident()}.tmp"
-            with open(tmp, "w", encoding="utf-8") as f:
+            with os.fdopen(os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600), "w", encoding="utf-8") as f:
                 json.dump({"content": content, "cost": cost, "model": MODEL}, f, ensure_ascii=False)
             os.replace(tmp, p)
             return content

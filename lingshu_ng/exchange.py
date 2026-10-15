@@ -182,6 +182,8 @@ def _insert(store: Store, table: str, rows: Sequence[Dict], node_ids: set, trust
         if any(_bad_value(table, c, r[c]) for c in cols):
             report["rejected_rows"][table] = report["rejected_rows"].get(table, 0) + 1
             continue
+        if table == "nodes" and store.db.conn.execute("SELECT 1 FROM nodes WHERE id=?", (r["id"],)).fetchone():
+            report["overwritten"][table] = report["overwritten"].get(table, 0) + 1   # sec-r2 O2：覆盖已有节点须可见
         store.db.conn.execute(f"INSERT OR REPLACE INTO {table} ({', '.join(cols)}) "
                               f"VALUES ({schema.placeholders(len(cols))})", tuple(r[c] for c in cols))
         n += 1
@@ -200,7 +202,7 @@ def import_all(store: Store, input_path: str, designer_key: Optional[str] = None
     trusted = verify_designer(designer_key)
     have = store.db.tables()
     report: Dict = {"imported": {}, "skipped_tables": [], "quarantined": {},
-                    "dropped_columns": set(), "orphan_edges_rejected": 0, "rejected_rows": {}}
+                    "dropped_columns": set(), "orphan_edges_rejected": 0, "rejected_rows": {}, "overwritten": {}}
     with store.db.tx():
         for t in TABLES:
             if t not in have:
