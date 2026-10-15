@@ -10,6 +10,7 @@
     recall        --db PATH QUERY [--limit 10]                             召回，打印 JSON
     status        --db PATH                                                库状态
     capabilities  [--db PATH]                                              当前生效档位
+    doctor        [--db PATH]                                              只读自检，失败退出码 1
     backup        --db PATH DEST [--force]                                 在线快照 + integrity_check + SHA-256 清单
     restore       --db PATH SNAPSHOT [--force]                             校验快照后原子替换库（先停服务；旧库自动另存）
     version                                                                打印版本号
@@ -58,6 +59,7 @@ def _parser() -> argparse.ArgumentParser:
     p = add("restore", "从快照恢复（先停服务）")
     p.add_argument("snapshot")
     p.add_argument("--force", action="store_true", help="目标库已存在时覆盖（旧库自动另存为 .pre-restore-时间戳）")
+    add("doctor", "只读自检（完整性/schema/磁盘/令牌配置/可选件），失败退出码 1")
     add("version", "版本号", db=False)
     return ap
 
@@ -80,7 +82,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         _print({"version": __version__})
         return 0
     db = a.db or (":memory:" if a.cmd == "capabilities" else None)
-    if not db:
+    if not db and a.cmd != "doctor":
         sys.stderr.write(f"需要 --db 或环境变量 {DB_ENV}\n")
         return 2
     if a.cmd == "serve":
@@ -98,6 +100,11 @@ def main(argv: Optional[List[str]] = None) -> int:
         from .mcp import run_stdio
         run_stdio(db)
         return 0
+    if a.cmd == "doctor":
+        from .doctor import run_doctor
+        rep = run_doctor(a.db)
+        _print(rep)
+        return 0 if rep["ok"] else 1
     if a.cmd in ("backup", "restore"):
         from . import backup as bk
         from .http import audit
