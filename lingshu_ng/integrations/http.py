@@ -177,14 +177,13 @@ class _Handler(BaseHTTPRequestHandler):
 class Server(ThreadingHTTPServer):
     """持有 :class:`Service` 与令牌的 HTTP 服务。"""
     daemon_threads = True
-    #: listen 积压队列（缺省 5 在突发并发下会被内核 RST，sec-r1）
-    request_queue_size = 128
 
     def __init__(self, service: Service, host: str = "127.0.0.1", port: int = 8765, token: Optional[str] = None):
         if not is_loopback(host) and not token:
             raise PermissionError(f"绑定非回环地址 {host} 必须设置令牌（--token 或 {TOKEN_ENV}）")
         self.service, self.token = service, token or None
         self.loopback_only = is_loopback(host)
+        self.request_queue_size = 128   # listen 积压（socketserver 缺省 5，突发并发下被内核 RST；sec-r1）
         super().__init__((host, port), _Handler)
 
 
