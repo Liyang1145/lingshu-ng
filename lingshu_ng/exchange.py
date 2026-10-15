@@ -16,6 +16,7 @@
 from __future__ import annotations
 
 import json
+import math
 from typing import Dict, List, Optional, Sequence, Tuple
 
 from . import dedup
@@ -133,10 +134,32 @@ def _sanitize_node(r: Dict) -> int:
     return fixed
 
 
+def _bad_value(table: str, col: str, v) -> bool:
+    """sec-r1：值与 schema 声明类型不符（TEXT 须 str/None、REAL/INTEGER 须数或可解析的数字串、主键非空）。
+    坏值行整行拒收（计入 ``rejected_rows``），不让一条类型混淆的行在召回时抛 TypeError 毒化整库。"""
+    decl = dict(schema.TABLES[table][0]).get(col, "") if table in schema.TABLES else ""
+    if isinstance(v, (dict, list)):
+        return True
+    if v is None:
+        return "PRIMARY KEY" in decl
+    if decl.startswith("TEXT"):
+        return not isinstance(v, str)
+    if decl.startswith(("REAL", "INTEGER")):
+        if isinstance(v, str):
+            try:
+                return not math.isfinite(float(v))
+            except ValueError:
+                return True
+        return not isinstance(v, (int, float))
+    return False
+
+
 def _insert(store: Store, table: str, rows: Sequence[Dict], node_ids: set, trusted: bool,
             report: Dict) -> int:
     allowed = _columns(store, table)
     n = 0
+    if not isinstance(rows, (list, tuple)):
+        raise ValueError(f"备份中 {table} 应为数组（收到 {type(rows).__name__}），拒绝导入")
     for r in rows:
         if not isinstance(r, dict) or _internal_meta(table, r):
             continue
@@ -156,6 +179,9 @@ def _insert(store: Store, table: str, rows: Sequence[Dict], node_ids: set, trust
             k = _sanitize_node(r)
             if k:
                 report["sanitized_nodes"] = report.get("sanitized_nodes", 0) + 1
+        if any(_bad_value(table, c, r[c]) for c in cols):
+            report["rejected_rows"][table] = report["rejected_rows"].get(table, 0) + 1
+            continue
         store.db.conn.execute(f"INSERT OR REPLACE INTO {table} ({', '.join(cols)}) "
                               f"VALUES ({schema.placeholders(len(cols))})", tuple(r[c] for c in cols))
         n += 1
@@ -165,11 +191,16 @@ def _insert(store: Store, table: str, rows: Sequence[Dict], node_ids: set, trust
 def import_all(store: Store, input_path: str, designer_key: Optional[str] = None) -> Dict:
     """X2–X4：单事务导入；返回各表导入数与隔离/丢弃明细。"""
     with open(input_path, encoding="utf-8") as f:
-        data = json.loads(f.read(), parse_constant=_reject)   # 拒收 NaN/Infinity
+        try:
+            data = json.loads(f.read(), parse_constant=_reject)   # 拒收 NaN/Infinity
+        except RecursionError:
+            raise ValueError("备份 JSON 嵌套过深，拒绝导入") from None
+    if not isinstance(data, dict):
+        raise ValueError(f"备份顶层应为 JSON 对象（收到 {type(data).__name__}），拒绝导入")
     trusted = verify_designer(designer_key)
     have = store.db.tables()
     report: Dict = {"imported": {}, "skipped_tables": [], "quarantined": {},
-                    "dropped_columns": set(), "orphan_edges_rejected": 0}
+                    "dropped_columns": set(), "orphan_edges_rejected": 0, "rejected_rows": {}}
     with store.db.tx():
         for t in TABLES:
             if t not in have:
