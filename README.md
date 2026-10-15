@@ -119,7 +119,7 @@ python -m pytest tests_ng -q           # 核心测试；插件测试在 plugins/
 |---|---|---|
 | `pip install lingshu-ng` | 无第三方依赖 | 记忆核心 `lingshu_ng`（纯标准库） |
 | `pip install lingshu-ng-embed` | `numpy`、`onnxruntime`、`tokenizers` | 可选语义件（`lingshu_ng.semrank` 交叉编码 / 稠密 / 判别头的模型部分、`lingshu_ng.embed.OnnxEmbedder`、`lingshu_ng.embed.cross.OnnxCrossEncoder`）；模型权重不随包发布，需自备并设 `LINGSHU_NG_SEM` |
-| `pip install lingshu-ng-world` / `lingshu-ng-nn` / `lingshu-ng-gen` | `numpy>=2.3.5,<2.6`、`Pillow>=12.2,<13`（gen 另需 lingshu-ng-nn） | `lingshu_ng.world` / `nn` / `gen`（导入路径不变） |
+| `pip install lingshu-ng-world` / `lingshu-ng-nn` / `lingshu-ng-gen` | `numpy>=2.3.5,<2.6`、`Pillow>=12.3,<13`（gen 另需 lingshu-ng-nn） | `lingshu_ng.world` / `nn` / `gen`（导入路径不变） |
 
 旧命令对照：`".[embed]"` → `lingshu-ng-embed`；`".[world]"` / `[nn]` / `[gen]` → 对应插件包；`".[full]"` → 四个插件包；`".[dev]"` → 自行 `pip install pytest`。
 没装插件时：中文长请求逐位退回 v4 词面档（与无模型时相同），进程内打一次 WARNING 提示 `pip install lingshu-ng-embed`；`import lingshu_ng.world` 抛带安装提示的 `ModuleNotFoundError`。
