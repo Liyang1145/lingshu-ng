@@ -6,3 +6,4 @@
 - 新增公开 API：`lingshu_ng.integrations.http.Server.valid_tokens`（只增不改）。
 - E5-2 流式导出：`GET /v1/export` 改为临时文件逐块（64 KiB）写出，响应形状不变（`{"report", "backup"}`），不再把整份备份解析进内存。
 - E5-4 审计覆盖 MCP 与 CLI：`lingshu_perceive`（含失败）与 `lingshu-ng perceive` 也写 `lingshu_ng.audit`，`remote` 字段为 `mcp` / `cli`，同样不含正文。
+- E5-5 控制台真实浏览器端到端：`tests_e2e/`（Playwright + Chromium，未装则跳过）覆盖 CSP 下无脚本错误、写入、检索、浏览、详情、二次确认删除、XSS 负载只作文本、令牌登录（只进 sessionStorage）、中英切换、导出下载；CI 新增 `console-e2e` 作业。
