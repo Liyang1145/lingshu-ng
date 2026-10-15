@@ -113,7 +113,7 @@ def _audit_fields(op: str, body, out) -> dict:
         return f
     if op == "import_backup" and out:
         rej = out.get("rejected_rows") or {}
-        return {"imported": out.get("imported"), "rejected_rows_n": sum(len(v) if isinstance(v, (list, dict)) else int(v or 0)
+        return {"imported": out.get("imported"), "overwritten": out.get("overwritten") or {}, "rejected_rows_n": sum(len(v) if isinstance(v, (list, dict)) else int(v or 0)
                                                                          for v in rej.values()),
                 "quarantined": {k: (len(v) if isinstance(v, (list, dict)) else v)
                                 for k, v in (out.get("quarantined") or {}).items()}}

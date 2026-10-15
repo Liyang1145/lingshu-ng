@@ -363,6 +363,8 @@ def test_export_import_round_trip(srv):
     assert st == 200 and rep["imported"]["nodes"] == 2 and rep["imported"]["edges"] == 1 and rep["integrity_ok"]
     assert _json(port2, "GET", "/v1/status")[1]["total"] == 2
     assert _json(port2, "GET", f"/v1/nodes/{a}")[1]["edges"]["outgoing_total"] == 1
+    st, rep2 = _json(port2, "POST", "/v1/import", {"backup": backup, "confirm": True})   # 再导一次：全部是覆盖
+    assert st == 200 and rep2.get("overwritten", {}).get("nodes") == 2, rep2
 
 
 def test_import_report_includes_rejected_rows(srv):
@@ -412,7 +414,7 @@ def test_audit_log_has_no_content(srv, caplog):
     assert [x["node_id"] for x in lines if x["op"] == "delete_node"] == [nid]
     assert [x["node_id"] for x in lines if x["op"] == "perceive" and x["status"] == 200] == [nid]
     imp = [x for x in lines if x["op"] == "import_backup"][0]
-    assert imp["imported"]["nodes"] == 1
+    assert imp["imported"]["nodes"] == 1 and "overwritten" in imp
     for r in recs:
         assert SECRET not in r.getMessage() and "审计" not in r.getMessage()
 

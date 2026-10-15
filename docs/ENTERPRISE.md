@@ -43,6 +43,8 @@ docker run -d --name lingshu -p 127.0.0.1:8765:8765 -v lingshu-data:/data \
 ```
 前面挂 Nginx / Caddy 做 TLS，并限制来源网段。
 
+**本机管理界面**：`lingshu-ng console --db PATH`（缺省 127.0.0.1:8766）提供浏览 / 检索 / 写入 / 删除 / 导入导出 / 健康页面，安全措施与 `serve` 相同，另加 CSP、`X-Lingshu-Console` 头和写操作审计日志（logger `lingshu_ng.audit`）。容器内可改用 `CMD ["lingshu-ng", "console", "--host", "0.0.0.0", "--port", "8766"]`（同样必须给令牌）。见 [`CONSOLE.md`](CONSOLE.md)。
+
 **备份**：`lingshu-ng` 的 `export_all` 产出 JSON 全量备份；或在服务停写时复制 `memory.sqlite`（含 `-wal`）。
 
 ## 5. 运维要点

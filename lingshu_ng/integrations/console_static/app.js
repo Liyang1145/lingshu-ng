@@ -35,7 +35,7 @@
       "选择 export 导出的 JSON 备份。同 id 的节点会被覆盖；共享层与治理表按规则隔离（不接受设计者密钥）。",
       choose_file: "选择文件", file_summary: "文件 {f}：{n} 个节点、{e} 条边（meta.version = {v}）",
       import_confirm: "我确认导入（同 id 节点将被覆盖）", import_btn: "导入", import_report: "导入报告",
-      imported: "导入", rejected_rows: "拒收行", quarantined: "隔离", dropped_columns: "丢弃列",
+      imported: "导入", overwritten: "覆盖", rejected_rows: "拒收行", quarantined: "隔离", dropped_columns: "丢弃列",
       orphan_edges: "孤儿边拒收", integrity: "完整性", bad_json: "文件不是合法 JSON：{e}", table: "表",
       count: "数", raw: "原始 JSON", healthz: "/healthz", uptime: "运行时长", started_at: "启动时间",
       req_total: "请求总数", req_recent: "最近 {w} 秒请求数", auth: "鉴权", auth_token: "Bearer 令牌",
@@ -67,7 +67,7 @@
       "Pick a JSON backup produced by export. Nodes with the same id are overwritten; shared layers and governance tables are quarantined (no designer key).",
       choose_file: "Choose file", file_summary: "File {f}: {n} nodes, {e} edges (meta.version = {v})",
       import_confirm: "I confirm the import (nodes with the same id will be overwritten)", import_btn: "Import", import_report: "Import report",
-      imported: "Imported", rejected_rows: "Rejected rows", quarantined: "Quarantined", dropped_columns: "Dropped columns",
+      imported: "Imported", overwritten: "Overwritten", rejected_rows: "Rejected rows", quarantined: "Quarantined", dropped_columns: "Dropped columns",
       orphan_edges: "Orphan edges rejected", integrity: "Integrity", bad_json: "Not valid JSON: {e}", table: "Table",
       count: "Count", raw: "Raw JSON", healthz: "/healthz", uptime: "Uptime", started_at: "Started",
       req_total: "Total requests", req_recent: "Requests in last {w}s", auth: "Auth", auth_token: "Bearer token",
@@ -428,16 +428,17 @@
   function renderImportReport(out, r) {
     clear(out);
     out.appendChild(h("h3", { text: t("import_report") }));
-    var imp = r.imported || {}, rej = r.rejected_rows || {}, qua = r.quarantined || {};
-    var tables = Object.keys(imp).concat(Object.keys(rej), Object.keys(qua)).filter(function (x, i, a) { return a.indexOf(x) === i; }).sort();
+    var imp = r.imported || {}, rej = r.rejected_rows || {}, qua = r.quarantined || {}, ovw = r.overwritten || {};
+    var tables = Object.keys(imp).concat(Object.keys(rej), Object.keys(qua), Object.keys(ovw)).filter(function (x, i, a) { return a.indexOf(x) === i; }).sort();
     var tb = h("tbody");
     tables.forEach(function (k) {
       var nrej = rej[k], nq = qua[k];
       tb.appendChild(h("tr", null, h("td", { class: "mono", text: k }), h("td", { class: "num", text: imp[k] === undefined ? "" : imp[k] }),
+        h("td", { class: "num" + (ovw[k] ? " warn" : ""), text: countOf(ovw[k]) }),
         h("td", { class: "num" + (nrej ? " warn" : ""), text: countOf(nrej) }), h("td", { class: "num" + (nq ? " warn" : ""), text: countOf(nq) })));
     });
     out.appendChild(h("table", null, h("thead", null, h("tr", null, h("th", { text: t("table") }), h("th", { text: t("imported") }),
-      h("th", { text: t("rejected_rows") }), h("th", { text: t("quarantined") }))), tb));
+      h("th", { text: t("overwritten") }), h("th", { text: t("rejected_rows") }), h("th", { text: t("quarantined") }))), tb));
     out.appendChild(h("dl", { class: "kv" },
       h("dt", { text: t("orphan_edges") }), h("dd", { text: r.orphan_edges_rejected }),
       h("dt", { text: t("dropped_columns") }), h("dd", { text: (r.dropped_columns || []).join(", ") || t("none") }),

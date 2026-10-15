@@ -42,9 +42,8 @@ MAX_PAGE = 200
 PREVIEW_CHARS = 300
 #: 节点详情最多回这么多条出边 / 入边
 MAX_EDGES = 200
-#: 节点 id / 标签的最大长度（字符）
+#: 节点 id 的最大长度（字符）；标签过滤沿用 inputs 的单项上限
 MAX_ID_CHARS = 512
-MAX_TAG_CHARS = 512
 
 
 def _node_id(v: Any) -> str:
@@ -168,8 +167,9 @@ class Service:
         tag = b.get("tag")
         if tag == "":
             tag = None
-        if tag is not None and (not isinstance(tag, str) or len(tag) > MAX_TAG_CHARS):
-            raise BadRequest(f"tag 必须是不超过 {MAX_TAG_CHARS} 字符的字符串")
+        from ..inputs import MAX_ITEM_CHARS
+        if tag is not None and (not isinstance(tag, str) or len(tag) > MAX_ITEM_CHARS):
+            raise BadRequest(f"tag 必须是不超过 {MAX_ITEM_CHARS} 字符的字符串（inputs.MAX_ITEM_CHARS）")
         offset = _bounded_int(b.get("offset", 0), "offset", 0, 10 ** 9)
         limit = _bounded_int(b.get("limit", 50), "limit", 1, MAX_PAGE)
         with self.lock:

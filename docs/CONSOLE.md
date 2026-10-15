@@ -43,7 +43,7 @@ lingshu-ng console --db ./mem.db --audit-log ./audit.jsonl
 | 节点详情（弹窗） | 全文、标签、实体、重要度、置信度、访问次数、是否受保护 / 可删除、出边和入边（含对端预览，可点开跳转） | `GET /v1/nodes/<id>` |
 | 删除 | 详情弹窗里点「删除节点」，再点「确认删除」（二次确认），节点和它的全部关联边一起删除 | `DELETE /v1/nodes/<id>` |
 | 写入 | perceive 表单：正文、标签、实体（逗号分隔）、重要度 | `POST /v1/perceive` |
-| 导入 / 导出 | 导出：整库 JSON 备份，浏览器里下载。导入：选文件后先显示节点数 / 边数摘要，勾选确认后才能导入；导入后显示报告（各表导入数、`rejected_rows`、`quarantined`、丢弃列、孤儿边、完整性） | `GET /v1/export`、`POST /v1/import` |
+| 导入 / 导出 | 导出：整库 JSON 备份，浏览器里下载。导入：选文件后先显示节点数 / 边数摘要，勾选确认后才能导入；导入后显示报告（各表导入数、覆盖数 `overwritten`、`rejected_rows`、`quarantined`、丢弃列、孤儿边、完整性） | `GET /v1/export`、`POST /v1/import` |
 | 健康 | `/healthz`、版本、运行时长、启动时间、请求总数、最近 300 秒请求数、鉴权方式 | `GET /healthz`、`GET /v1/health` |
 
 ## 3. 安全模型
@@ -67,7 +67,7 @@ lingshu-ng console --db ./mem.db --audit-log ./audit.jsonl
 - **CSP**：页面响应带 `Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`。没有内联脚本、内联事件处理器或内联样式，所以策略里不需要 `unsafe-inline` / `unsafe-eval`。JSON API 响应带 `default-src 'none'; frame-ancestors 'none'`。所有响应都带 `X-Content-Type-Options: nosniff`、`X-Frame-Options: DENY`、`Referrer-Policy: no-referrer`、`Cache-Control: no-store`。
 - **XSS**：前端只通过 `textContent` / `createTextNode` / 属性赋值把数据放进 DOM，整个前端不使用 `innerHTML`、`outerHTML`、`insertAdjacentHTML`、`document.write`、`eval` 这类会把字符串当 HTML 或代码解析的 API。测试会静态检查这一点。HTML 模板本身不含任何用户数据。
 - **审计**：每次写操作都记一行 JSON 到 logger `lingshu_ng.audit`（INFO 级），被拒绝的写操作也记。写操作指 perceive、delete、import。字段有 `ts`（UTC，ISO-8601）、`op`、`remote`（来源地址）、`status`（HTTP 状态码），另有按操作不同的 `node_id`、`action`、`layer`、`edges_removed`、导入计数、`error`（异常类型名）。**不含记忆正文和标签文本**，perceive 只记正文字符数与标签个数。读操作（recall、列表、详情、导出）不记审计。
-- **导入**：API 要求请求体里显式写 `"confirm": true`，页面上也要勾选确认。导入不接受设计者密钥，共享层和治理表按 `exchange.import_all` 的规则隔离，类型错误的行进 `rejected_rows`。注意：同 id 的 knowledge / context 节点**会被覆盖**（见 sec-r1 O2）。备份先写进 0700 临时目录下的 0600 文件，导入完即删除。
+- **导入**：API 要求请求体里显式写 `"confirm": true`，页面上也要勾选确认。导入不接受设计者密钥，共享层和治理表按 `exchange.import_all` 的规则隔离，类型错误的行进 `rejected_rows`。注意：同 id 的 knowledge / context 节点**会被覆盖**，覆盖数见报告里的 `overwritten`（sec-r2 O2），页面上单列显示。备份先写进 0700 临时目录下的 0600 文件，导入完即删除。
 - **删除**：共享层（anchor / structure）、受保护节点、级联会触及共享层边的节点，都回 409 拒绝。节点不存在回 404。
 
 **仍然不做的事（与 `serve` 相同）**：不做 TLS，不做多用户和角色。要对外暴露，请放在反向代理（TLS 加访问控制）之后，并设置令牌。令牌没有过期机制，轮换需要重启。
@@ -87,10 +87,10 @@ lingshu-ng console --db ./mem.db --audit-log ./audit.jsonl
 | POST | `/v1/perceive` | 是 | console 模式必需 | `{content, tags?, entities?, importance?, confidence?, layer?, skip_dedup?}` → `{node_id, action, layer, reason}` |
 | POST | `/v1/recall` | 是 | console 模式必需 | `{query, limit?}` → `{hits: [{id, content, score, layer, tags, importance, confidence, created_at}], negative}` |
 | GET | `/v1/nodes?layer=&tag=&offset=&limit=` | 是 | — | `{nodes: [{id, layer, tags, entities, importance, confidence, created_at, content(前 300 字), truncated}], total, offset, limit}`；`limit` 取 1–200（缺省 50），`offset` ≥ 0；未知或重复参数回 400 |
-| GET | `/v1/nodes/<id>` | 是 | — | 详情：`{id, content, modality, layer, tags, entities, entity_id, importance, confidence, access_count, created_at, last_access, temporal_coordinate, condition_space, protected, deletable, edges: {outgoing, incoming, outgoing_total, incoming_total}}`；每个方向最多 200 条边。`<id>` 需百分号编码，最长 512 字符 |
+| GET | `/v1/nodes/<id>` | 是 | — | 详情：`{id, content, modality, layer, tags, entities, entity_id, importance, confidence, access_count, created_at, last_access, temporal_coordinate, condition_space, protected, deletable, edges: {outgoing, incoming, outgoing_total, incoming_total}}`；每个方向最多 200 条边。`<id>` 需百分号编码，最长 512 字符；`tag` 过滤最长 `inputs.MAX_ITEM_CHARS`（1024）字符 |
 | DELETE | `/v1/nodes/<id>` | 是 | **任何模式都必需** | `{deleted, id, layer, edges_removed}`；404 不存在，409 层规则或保护名单拒绝 |
 | GET | `/v1/export` | 是 | — | `{report: {exported_nodes, tables, skipped_tables, not_exported_tables}, backup: <与 MemoryEngine.export_all 相同>}` |
-| POST | `/v1/import` | 是 | **任何模式都必需** | `{backup: {...}, confirm: true}` → 导入报告 `{imported, rejected_rows, quarantined, dropped_columns, orphan_edges_rejected, dangling_rows, integrity_ok, skipped_tables}`；请求体上限 32 MiB |
+| POST | `/v1/import` | 是 | **任何模式都必需** | `{backup: {...}, confirm: true}` → 导入报告 `{imported, overwritten, rejected_rows, quarantined, dropped_columns, orphan_edges_rejected, dangling_rows, integrity_ok, skipped_tables}`；请求体上限 32 MiB |
 
 对应的 `Service` 方法分别是 `list_nodes`、`get_node`、`delete_node`、`export_backup`、`import_backup`，HTTP 以外也能直接调用。入参校验复用 `lingshu_ng.inputs`：`limit` / `offset` 用 `inputs.limit` 的整数口径，`id` 用 `inputs.content` 拒孤立代理码位；未知字段一律 400。新增的异常类有 `service.NotFound` 和 `service.Conflict`，都是 `BadRequest` 的子类。
 
