@@ -34,6 +34,9 @@ from pydantic import ConfigDict  # noqa: E402  （langchain-core 的必需依赖
 
 from ._backend import Backend, Record, iso, match_filters  # noqa: E402
 
+#: 适配器内部元数据键（不回给调用方）
+_INTERNAL = frozenset({"_lc_id", "_ts", "_updated_at", "lc_message"})
+
 __all__ = ["LingshuChatMessageHistory", "LingshuRetriever", "LingshuVectorStore", "record_document"]
 
 
@@ -46,13 +49,16 @@ def _text(content: Any) -> str:
     return "" if content is None else str(content)
 
 
-def record_document(r: Record, score: Optional[float] = None, ext_id: Optional[str] = None) -> Document:
-    """记录 → ``Document``：``page_content`` 为原文；``metadata`` = 写入时的元数据 + ``lingshu_*`` 溯源字段。"""
-    meta = {k: v for k, v in r.meta.items() if not k.startswith("_") and k != "lc_message"}
-    meta.update({"lingshu_id": r.id, "lingshu_layer": getattr(r.node.layer, "value", r.node.layer),
-                 "lingshu_created_at": iso(r.node.created_at)})
-    if score is not None:
-        meta["score"] = round(float(score), 6)
+def record_document(r: Record, score: Optional[float] = None, ext_id: Optional[str] = None,
+                    provenance: bool = True) -> Document:
+    """记录 → ``Document``：``page_content`` 为原文；``metadata`` = 写入时的元数据（``provenance`` 时另加 ``lingshu_*``
+    溯源字段与 ``score``；向量库接口按 LangChain 约定原样返回写入时的元数据，不加）。"""
+    meta = {k: v for k, v in r.meta.items() if k not in _INTERNAL}
+    if provenance:
+        meta.update({"lingshu_id": r.id, "lingshu_layer": getattr(r.node.layer, "value", r.node.layer),
+                     "lingshu_created_at": iso(r.node.created_at)})
+        if score is not None:
+            meta["score"] = round(float(score), 6)
     return Document(page_content=r.text, metadata=meta, id=ext_id or r.meta.get("_lc_id") or r.id)
 
 
@@ -117,7 +123,10 @@ class LingshuRetriever(BaseRetriever):
     filter: Optional[Dict[str, Any]] = None
     min_score: float = 0.0
 
-    def _get_relevant_documents(self, query: str, *, run_manager: CallbackManagerForRetrieverRun) -> List[Document]:
+    def _get_relevant_documents(self, query: str, *, run_manager: CallbackManagerForRetrieverRun,
+                                k: Optional[int] = None, **kwargs: Any) -> List[Document]:
+        """``invoke(query, k=3)`` 可临时覆盖 ``self.k``（LangChain 标准检索器约定）。"""
+        k = int(self.k if k is None else k)
         b = Backend(engine=self.engine, namespace=self.namespace or "_")
         own = b.owner_tag if self.namespace else None
 
@@ -125,19 +134,22 @@ class LingshuRetriever(BaseRetriever):
             return ((own is None or own in r.tags) and (r.score or 0.0) >= self.min_score
                     and match_filters(r.meta, self.filter))
 
-        return [record_document(r, r.score) for r in b.search(query, int(self.k), keep)]
+        return [record_document(r, r.score) for r in b.search(query, k, keep)]
 
 
 # --------------------------------------------------------------------------- 向量库接口
 class LingshuVectorStore(VectorStore):
     """``VectorStore`` 接口的 lingshu_ng 实现（检索不用外部向量；见模块说明）。
 
-    ``collection_name`` 把同一引擎里的多个集合隔开（同一 ``namespace`` 下按标签区分）。``ids`` 为调用方给定的外部 id：
+    ``collection_name`` 把同一引擎里的多个集合隔开（同一 ``namespace`` 下按标签区分）。``fill_k``（缺省 True）：
+    召回到的文档不足 ``k`` 条时按写入顺序用其余文档（分数 0）补足——向量库的 kNN 约定；False ⇒ 只返回召回命中。``ids`` 为调用方给定的外部 id：
     同 id 再次写入 = 覆盖（先删后写）。"""
 
     def __init__(self, embedding: Any = None, *, engine=None, path: str = ":memory:", namespace: str = "lcvs",
-                 collection_name: str = "default"):
+                 collection_name: str = "default", fill_k: bool = True):
         self._embedding = embedding
+        #: True（缺省）⇒ 召回不足 k 条时用集合里其余文档（0 分）补足，符合 VectorStore「返回 k 个最近邻」的约定
+        self.fill_k = bool(fill_k)
         self._b = Backend(engine=engine, path=path, namespace=namespace)
         self.engine = self._b.engine
         self.collection_name = collection_name
@@ -198,7 +210,7 @@ class LingshuVectorStore(VectorStore):
         out: List[Document] = []
         for i in ids:
             for r in self._by_ext(str(i)):
-                out.append(record_document(r, ext_id=str(i)))
+                out.append(record_document(r, ext_id=str(i), provenance=False))
         return out
 
     def similarity_search_with_score(self, query: str, k: int = 4, filter: Optional[Dict[str, Any]] = None,
@@ -208,7 +220,18 @@ class LingshuVectorStore(VectorStore):
         def keep(r: Record) -> bool:
             return need <= set(r.tags) and match_filters(r.meta, filter)
 
-        return [(record_document(r, r.score), float(r.score or 0.0)) for r in self._b.search(query, int(k), keep)]
+        k = int(k)
+        hits = self._b.search(query, k, keep)
+        if self.fill_k and len(hits) < k:
+            # 向量库约定：返回 min(k, 集合大小) 条最近邻。词面 / 语义召回不到的其余文档以 0 分按写入顺序补足。
+            seen = {r.id for r in hits}
+            for r in self._b.by_tags([self._b.owner_tag] + self._scope):
+                if len(hits) >= k:
+                    break
+                if r.id not in seen and match_filters(r.meta, filter):
+                    r.score = 0.0
+                    hits.append(r)
+        return [(record_document(r, provenance=False), float(r.score or 0.0)) for r in hits]
 
     def similarity_search(self, query: str, k: int = 4, **kwargs: Any) -> List[Document]:
         return [d for d, _ in self.similarity_search_with_score(query, k, **kwargs)]

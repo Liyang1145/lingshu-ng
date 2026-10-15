@@ -1,0 +1,25 @@
+{
+ "mem0ai": "2.2.1",
+ "Memory": {
+  "add": {"params":[["self","POSITIONAL_OR_KEYWORD","<required>"],["messages","POSITIONAL_OR_KEYWORD","<required>"],["user_id","KEYWORD_ONLY","None"],["agent_id","KEYWORD_ONLY","None"],["run_id","KEYWORD_ONLY","None"],["metadata","KEYWORD_ONLY","None"],["timestamp","KEYWORD_ONLY","None"],["expiration_date","KEYWORD_ONLY","None"],["infer","KEYWORD_ONLY","True"],["memory_type","KEYWORD_ONLY","None"],["prompt","KEYWORD_ONLY","None"]],"async":false},
+  "get": {"params":[["self","POSITIONAL_OR_KEYWORD","<required>"],["memory_id","POSITIONAL_OR_KEYWORD","<required>"]],"async":false},
+  "get_all": {"params":[["self","POSITIONAL_OR_KEYWORD","<required>"],["filters","KEYWORD_ONLY","None"],["top_k","KEYWORD_ONLY","20"],["show_expired","KEYWORD_ONLY","False"],["kwargs","VAR_KEYWORD","<required>"]],"async":false},
+  "search": {"params":[["self","POSITIONAL_OR_KEYWORD","<required>"],["query","POSITIONAL_OR_KEYWORD","<required>"],["top_k","KEYWORD_ONLY","20"],["filters","KEYWORD_ONLY","None"],["threshold","KEYWORD_ONLY","0.1"],["rerank","KEYWORD_ONLY","False"],["explain","KEYWORD_ONLY","False"],["reference_date","KEYWORD_ONLY","None"],["show_expired","KEYWORD_ONLY","False"],["kwargs","VAR_KEYWORD","<required>"]],"async":false},
+  "update": {"params":[["self","POSITIONAL_OR_KEYWORD","<required>"],["memory_id","POSITIONAL_OR_KEYWORD","<required>"],["text","POSITIONAL_OR_KEYWORD","None"],["metadata","POSITIONAL_OR_KEYWORD","None"],["expiration_date","POSITIONAL_OR_KEYWORD","<sentinel>"],["data","POSITIONAL_OR_KEYWORD","None"]],"async":false},
+  "delete": {"params":[["self","POSITIONAL_OR_KEYWORD","<required>"],["memory_id","POSITIONAL_OR_KEYWORD","<required>"]],"async":false},
+  "delete_all": {"params":[["self","POSITIONAL_OR_KEYWORD","<required>"],["user_id","POSITIONAL_OR_KEYWORD","None"],["agent_id","POSITIONAL_OR_KEYWORD","None"],["run_id","POSITIONAL_OR_KEYWORD","None"]],"async":false},
+  "history": {"params":[["self","POSITIONAL_OR_KEYWORD","<required>"],["memory_id","POSITIONAL_OR_KEYWORD","<required>"]],"async":false},
+  "reset": {"params":[["self","POSITIONAL_OR_KEYWORD","<required>"]],"async":false}
+ },
+ "AsyncMemory": {
+  "add": {"params":[["self","POSITIONAL_OR_KEYWORD","<required>"],["messages","POSITIONAL_OR_KEYWORD","<required>"],["user_id","KEYWORD_ONLY","None"],["agent_id","KEYWORD_ONLY","None"],["run_id","KEYWORD_ONLY","None"],["metadata","KEYWORD_ONLY","None"],["timestamp","KEYWORD_ONLY","None"],["expiration_date","KEYWORD_ONLY","None"],["infer","KEYWORD_ONLY","True"],["memory_type","KEYWORD_ONLY","None"],["prompt","KEYWORD_ONLY","None"],["llm","KEYWORD_ONLY","None"]],"async":true},
+  "get": {"params":[["self","POSITIONAL_OR_KEYWORD","<required>"],["memory_id","POSITIONAL_OR_KEYWORD","<required>"]],"async":true},
+  "get_all": {"params":[["self","POSITIONAL_OR_KEYWORD","<required>"],["filters","KEYWORD_ONLY","None"],["top_k","KEYWORD_ONLY","20"],["show_expired","KEYWORD_ONLY","False"],["kwargs","VAR_KEYWORD","<required>"]],"async":true},
+  "search": {"params":[["self","POSITIONAL_OR_KEYWORD","<required>"],["query","POSITIONAL_OR_KEYWORD","<required>"],["top_k","KEYWORD_ONLY","20"],["filters","KEYWORD_ONLY","None"],["threshold","KEYWORD_ONLY","0.1"],["rerank","KEYWORD_ONLY","False"],["explain","KEYWORD_ONLY","False"],["reference_date","KEYWORD_ONLY","None"],["show_expired","KEYWORD_ONLY","False"],["kwargs","VAR_KEYWORD","<required>"]],"async":true},
+  "update": {"params":[["self","POSITIONAL_OR_KEYWORD","<required>"],["memory_id","POSITIONAL_OR_KEYWORD","<required>"],["text","POSITIONAL_OR_KEYWORD","None"],["metadata","POSITIONAL_OR_KEYWORD","None"],["expiration_date","POSITIONAL_OR_KEYWORD","<sentinel>"],["data","POSITIONAL_OR_KEYWORD","None"]],"async":true},
+  "delete": {"params":[["self","POSITIONAL_OR_KEYWORD","<required>"],["memory_id","POSITIONAL_OR_KEYWORD","<required>"]],"async":true},
+  "delete_all": {"params":[["self","POSITIONAL_OR_KEYWORD","<required>"],["user_id","POSITIONAL_OR_KEYWORD","None"],["agent_id","POSITIONAL_OR_KEYWORD","None"],["run_id","POSITIONAL_OR_KEYWORD","None"]],"async":true},
+  "history": {"params":[["self","POSITIONAL_OR_KEYWORD","<required>"],["memory_id","POSITIONAL_OR_KEYWORD","<required>"]],"async":true},
+  "reset": {"params":[["self","POSITIONAL_OR_KEYWORD","<required>"]],"async":true}
+ }
+}
