@@ -79,7 +79,14 @@ def main(argv: Optional[List[str]] = None) -> int:
         return 2
     if a.cmd == "version":
         from .. import __version__
-        _print({"version": __version__})
+        import importlib.util
+        import platform
+        try:
+            from ..store.schema import SCHEMA_VERSION as _sv
+        except Exception:
+            _sv = None
+        opt = {m: importlib.util.find_spec(m) is not None for m in ("numpy", "onnxruntime")}
+        _print({"version": __version__, "schema": _sv, "python": platform.python_version(), "optional": opt})
         return 0
     db = a.db or (":memory:" if a.cmd == "capabilities" else None)
     if not db and a.cmd != "doctor":
