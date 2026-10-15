@@ -86,7 +86,10 @@ def test_http_same_as_engine(server, tmp_path, monkeypatch):
     for q in ("温度传感器 异常", "值班员2", "tea Monday"):
         _, r = _req(base, "POST", "/v1/recall", {"query": q, "limit": 5})
         mine = [(n.content, round(float(s), 6)) for n, s in e.recall(q, 5)["hits"]]
-        assert [(h["content"], h["score"]) for h in r["hits"]] == mine
+        got = [(h["content"], h["score"]) for h in r["hits"]]
+        # 分数逐位相同；同分（6 位小数）组内先后取决于 created_at 是否同刻（Windows 时钟粒度粗），组内按集合比
+        assert [s for _, s in got] == [s for _, s in mine]
+        assert sorted(got, key=lambda x: (-x[1], x[0])) == sorted(mine, key=lambda x: (-x[1], x[0]))
     e.close()
 
 

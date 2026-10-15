@@ -71,3 +71,11 @@ def test_write_path_same_as_prefix_algorithm(monkeypatch):
         seqs.append(seq)
     assert seqs[0] == seqs[1]
     assert any(a == "merged" for a, _ in seqs[0])
+
+
+def test_write_path_deterministic_under_coarse_clock(monkeypatch):
+    """Windows 3.11/3.12 的 time.time 粒度约 15.6 ms：同刻写入多条时，去重「最新候选」仍须与细时钟一致（rel-v1.31）。"""
+    import time as _time
+    real = _time.time
+    monkeypatch.setattr(_time, "time", lambda: int(real() * 64) / 64.0)
+    test_write_path_same_as_prefix_algorithm(monkeypatch)

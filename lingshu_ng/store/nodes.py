@@ -296,7 +296,7 @@ class NodeRepo:
         if layers:
             sql += f" AND layer IN ({placeholders(len(layers))})"
             params = [MemoryLayer.coerce(x).value for x in layers]
-        sql += " ORDER BY created_at DESC, id" if newest_first else " ORDER BY created_at, id"
+        sql += " ORDER BY created_at DESC, id DESC" if newest_first else " ORDER BY created_at, id"
         if limit is not None:
             sql += " LIMIT ?"
             params.append(int(limit))
@@ -309,7 +309,9 @@ class NodeRepo:
             out += [tuple(r) for r in self.db.all(
                 f"SELECT id, content, created_at FROM nodes WHERE +layer=? AND id IN ({placeholders(len(part))})",
                 [MemoryLayer.coerce(layer).value, *part])]
-        out.sort(key=lambda r: (-(r[2] or 0.0), r[0]))
+        # 新→旧；created_at 相同（Windows 3.11/3.12 时钟粒度约 15.6 ms，同一刻写入多条）时按 id 倒序——id 按写入序单调（ids.py），
+        # 保证「最新」在任何时钟粒度下都指同一条（旧写法 id 升序会在同刻组内取最旧，去重合并目标随时钟粒度漂移）
+        out.sort(key=lambda r: ((r[2] or 0.0), r[0]), reverse=True)
         return out
 
     def scan(self, layers: Optional[Sequence[MemoryLayer]] = None) -> Iterator[Node]:
