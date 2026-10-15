@@ -411,6 +411,7 @@
 "lingshu_ng.integrations.http.Server.service_actions": "(self)",
 "lingshu_ng.integrations.http.Server.shutdown": "(self)",
 "lingshu_ng.integrations.http.Server.shutdown_request": "(self, request)",
+"lingshu_ng.integrations.http.Server.valid_tokens": "(self)",
 "lingshu_ng.integrations.http.Server.verify_request": "(self, request, client_address)",
 "lingshu_ng.integrations.http.make_server": "(db=':memory:', host='127.0.0.1', port=8765, token=None, service=None)",
 "lingshu_ng.integrations.http.serve": "(db, host='127.0.0.1', port=8765, token=None)",
@@ -500,5 +501,5 @@
 "lingshu_ng.types.WriteResult.fields": "node_id, action, layer, reason",
 "lingshu_ng.types.WriteResult.reason": "attr str"
 },
-"version": "1.31.0"
+"version": "1.32.0"
 }
