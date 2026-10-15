@@ -88,13 +88,21 @@ def _is_loud(handler):
     return False
 
 
+def _rel(path):
+    """相对 PKG 的路径；Windows 跨盘符（tmp 在 D:、包在 C:）时退回绝对路径。"""
+    try:
+        return os.path.relpath(path, PKG)
+    except ValueError:
+        return path
+
+
 def silent_broad_excepts(paths):
     """宽 except（裸 except / Exception / BaseException，含元组里出现者）且处理体既不 raise 也不记日志的位置。"""
     bad = []
     for path in paths:
         for node in ast.walk(ast.parse(open(path, encoding="utf-8").read())):
             if isinstance(node, ast.ExceptHandler) and _is_broad(node.type) and not _is_loud(node):
-                bad.append(f"{os.path.relpath(path, PKG)}:{node.lineno}")
+                bad.append(f"{_rel(path)}:{node.lineno}")
     return bad
 
 

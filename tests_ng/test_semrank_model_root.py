@@ -33,6 +33,7 @@ def test_unset_falls_back_to_user_cache_with_warning(monkeypatch, tmp_path, capl
     _reset(monkeypatch)
     monkeypatch.delenv("LINGSHU_NG_SEM", raising=False)
     monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("USERPROFILE", str(tmp_path))   # Windows 的 expanduser 读 USERPROFILE
     with caplog.at_level(logging.WARNING, logger="lingshu_ng"):
         d = semrank.model_root()
         semrank.model_root()
@@ -49,6 +50,7 @@ def test_unset_existing_default_dir_is_used(monkeypatch, tmp_path):
     _reset(monkeypatch)
     monkeypatch.delenv("LINGSHU_NG_SEM", raising=False)
     monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("USERPROFILE", str(tmp_path))   # Windows 的 expanduser 读 USERPROFILE
     d = tmp_path / ".cache" / "lingshu_ng" / "models"
     d.mkdir(parents=True)
     assert semrank.model_root() == str(d)
@@ -73,6 +75,7 @@ def test_xdg_cache_home(monkeypatch, tmp_path):
     _reset(monkeypatch)
     monkeypatch.delenv("LINGSHU_NG_SEM", raising=False)
     monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("USERPROFILE", str(tmp_path / "home"))   # Windows 的 expanduser 读 USERPROFILE
     monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "xdg"))
     assert semrank.default_model_dir() == os.path.join(str(tmp_path / "xdg"), "lingshu_ng", "models")
     assert semrank.model_root(warn=False) == semrank.default_model_dir()

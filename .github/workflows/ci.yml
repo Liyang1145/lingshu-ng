@@ -32,4 +32,19 @@ jobs:
         with:
           python-version: "3.12"
       - run: python -m pip install pytest numpy Pillow
-      - run: python -m pytest -q tests_ng plugins/*/tests_*
+      - run: python -m pytest -q tests_ng
+      # 各插件 conftest 同名，分开跑避免模块名冲突
+      - run: for d in plugins/*/tests_*; do echo "== $d"; python -m pytest -q "$d" || exit 1; done
+        shell: bash
+  adapters:
+    # 生态适配器：装 langchain-core / llama-index-core / mem0 对照，跑官方标准套件
+    runs-on: ubuntu-latest
+    env:
+      LINGSHU_NG_SEM: "off"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install pytest pytest-asyncio "langchain-core>=1.6,<2" langchain-tests "llama-index-core>=0.14,<0.15"
+      - run: python -m pytest -q plugins/lingshu-ng-adapters/tests_adapters
