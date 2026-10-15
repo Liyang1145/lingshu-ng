@@ -48,3 +48,17 @@ jobs:
           python-version: "3.12"
       - run: python -m pip install pytest pytest-asyncio "langchain-core>=1.6,<2" langchain-tests "llama-index-core>=0.14,<0.15"
       - run: python -m pytest -q plugins/lingshu-ng-adapters/tests_adapters
+  docker:
+    # 镜像可构建、非 root、带令牌能起服务、/healthz 正常、无令牌拒绝启动
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t lingshu-ng:ci .
+      - run: |
+          docker run -d --name ls -p 8765:8765 -e LINGSHU_NG_TOKEN=ci-token lingshu-ng:ci
+          for i in $(seq 1 20); do curl -fsS http://127.0.0.1:8765/healthz && break; sleep 1; done
+          curl -fsS -H "Authorization: Bearer ci-token" -X POST -d '{"content":"docker smoke"}' http://127.0.0.1:8765/v1/perceive
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8765/v1/status)" = 401
+          test "$(docker exec ls id -u)" = 10001
+          docker rm -f ls
+          ! docker run --rm lingshu-ng:ci
