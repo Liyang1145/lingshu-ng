@@ -6,7 +6,7 @@ import sys
 
 import pytest
 
-from conftest import REPO, SRC, require
+from conftest import REPO, SRC
 
 HAS_LC = True
 try:
