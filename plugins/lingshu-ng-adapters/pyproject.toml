@@ -27,7 +27,7 @@ all = ["langchain-core>=1.6,<2", "llama-index-core>=0.14,<0.15"]
 dev = ["pytest"]
 
 [project.urls]
-Source = "https://github.com/TanPowasd/LingShu-prime/tree/main/Liyang/plugins/lingshu-ng-adapters"
+Source = "https://github.com/Liyang1145/lingshu-ng/tree/main/plugins/lingshu-ng-adapters"
 
 [tool.setuptools.dynamic]
 version = { attr = "lingshu_ng_adapters.__version__" }
