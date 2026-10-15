@@ -109,7 +109,7 @@ v2（ng 早期，ec5a2aea，未发布）→ **v3**（4bfafa7b 派生倒排索引
 
 <!-- 以下由 tools/ci/gen_api_appendix.py 生成，勿手改 -->
 
-公开名字与签名共 494 项（含兼容门面支持状态 167 项，见快照 `tests_ng/api_snapshot.json`）。签名只列参数名、种类与缺省值。
+公开名字与签名共 499 项（含兼容门面支持状态 167 项，见快照 `tests_ng/api_snapshot.json`）。签名只列参数名、种类与缺省值。
 
 #### `lingshu_ng.__version__`
 
@@ -208,6 +208,11 @@ v2（ng 早期，ec5a2aea，未发布）→ **v3**（4bfafa7b 派生倒排索引
 - `__init__`: `(self, path=':memory:', engine=None)`
 - `capabilities`: `(self, body=None)`
 - `close`: `(self)`
+- `delete_node`: `(self, body)`
+- `export_backup`: `(self, body=None)`
+- `get_node`: `(self, body)`
+- `import_backup`: `(self, body)`
+- `list_nodes`: `(self, body=None)`
 - `perceive`: `(self, body)`
 - `recall`: `(self, body)`
 - `status`: `(self, body=None)`
