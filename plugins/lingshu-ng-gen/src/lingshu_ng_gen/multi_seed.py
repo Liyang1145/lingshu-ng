@@ -51,7 +51,7 @@ def parse_prompt(p: Optional[str]) -> Optional[Dict]:
     num, color, pat, shape, rest = m.groups()
     if color not in COLORS or shape not in SHAPES or (pat and pat not in ("striped", "dotted")):
         return None
-    zone_text = re.sub(r"\s*(area)?\s*,?\s*(plain)?\s*$", "", rest.strip()).strip()
+    zone_text = re.sub(r"\s*+(area)?\s*+,?\s*+(plain)?\s*+$", "", rest.strip()).strip()
     cells = next((set(ZONE_CELLS[ph]) for ph in sorted(ZONE_CELLS, key=len, reverse=True)
                   if zone_text.startswith(ph)), None)
     return {"n": NUM_WORDS[num], "color": color, "pattern": pat or "plain", "shape": shape,

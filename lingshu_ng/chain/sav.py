@@ -70,6 +70,9 @@ _MOVE_CUE = re.compile(r"→|->|=>|搬去|搬到|搬进|迁到|迁往|迁至|挪
                        r"(?<![A-Za-z_])(?:moved?\s+to|is\s+now\s+in|now\s+in|relocated?\s+to|went\s+to|in)(?![A-Za-z_])", re.I)
 
 
+#: 取值尾部「了」/括注/空白（sec-r1：占有量词，与旧式 ``\s*了?\s*(…)?\s*$`` 逐例等价，消除四次方回溯）
+_VALUE_TAIL = re.compile(r"\s*+了?\s*+(?:[（(][^（）()]*[）)])?\s*+$")
+
 def _shape(v: Optional[str]) -> str:
     if not v:
         return ""
@@ -373,7 +376,7 @@ def repair_value(ev, ns: str, names: List[str], info: AttrInfo) -> None:
         for f in ("value", "alt"):
             v = getattr(ev, f)
             if v:
-                v2 = re.sub(r"\s*了?\s*(?:[（(][^（）()]*[）)])?\s*$", "", v).strip()
+                v2 = re.sub(_VALUE_TAIL, "", v).strip()
                 v2 = re.sub(r"^(?:有|现为|现在是|是|为|成)\s*", "", v2).strip() or v2
                 if v2 != v and _shape(v2) == "cjk":
                     setattr(ev, f, v2)
