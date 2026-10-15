@@ -26,6 +26,8 @@ _log = logging.getLogger("lingshu_ng.integrations.mcp")
 #: 支持的协议版本（新 → 旧）；客户端请求其中之一则回同一版本，否则回最新
 PROTOCOL_VERSIONS = ("2025-06-18", "2025-03-26", "2024-11-05")
 SERVER_NAME = "lingshu-ng"
+#: 单行消息上限（字符）：超限行丢弃并回 -32600，不整行读入内存（sec-r1）
+MAX_LINE = 8 << 20
 
 _STR = {"type": "string"}
 TOOLS = [
@@ -73,7 +75,7 @@ class McpServer:
 
     def _call(self, params: Dict[str, Any]) -> Dict[str, Any]:
         name, args = params.get("name"), params.get("arguments") or {}
-        if name not in _TOOL_OP:
+        if not isinstance(name, str) or name not in _TOOL_OP:
             raise RpcError(-32602, f"未知工具 {name!r}")
         try:
             out = getattr(self.service, _TOOL_OP[name])(args)
@@ -121,10 +123,30 @@ def _reply(line: str, srv: McpServer):
         msg = json.loads(line)
     except ValueError as e:
         return _error(None, -32700, f"JSON 解析失败：{e}")
+    except RecursionError:
+        return _error(None, -32700, "JSON 解析失败：嵌套过深")
+    if msg == []:
+        return _error(None, -32600, "空批量")
     if isinstance(msg, list):  # 批量（2025-03-26 允许；2025-06-18 已移除，仍兼容收）
         out = [r for r in (srv.handle(m) for m in msg) if r is not None]
         return out or None
     return srv.handle(msg)
+
+
+def _lines(stdin):
+    """逐行读，单行超过 :data:`MAX_LINE` 时丢弃余下部分并产出 ``None``（sec-r1）。"""
+    while True:
+        line = stdin.readline(MAX_LINE + 1)
+        if not line:
+            return
+        if len(line) > MAX_LINE and not line.endswith("\n"):
+            while True:
+                rest = stdin.readline(1 << 16)
+                if not rest or rest.endswith("\n"):
+                    break
+            yield None
+            continue
+        yield line
 
 
 def run_stdio(db: str, stdin=None, stdout=None, service: Optional[Service] = None) -> None:
@@ -132,10 +154,10 @@ def run_stdio(db: str, stdin=None, stdout=None, service: Optional[Service] = Non
     stdin, stdout = stdin or sys.stdin, stdout or sys.stdout
     srv = McpServer(service or Service(db))
     try:
-        for line in stdin:
-            if not line.strip():
+        for line in _lines(stdin):
+            if line is not None and not line.strip():
                 continue
-            r = _reply(line, srv)
+            r = _error(None, -32600, f"消息超过 {MAX_LINE} 字符") if line is None else _reply(line, srv)
             if r is not None:
                 stdout.write(json.dumps(r, ensure_ascii=False, default=str) + "\n")
                 stdout.flush()
