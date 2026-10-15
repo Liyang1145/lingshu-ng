@@ -4,6 +4,7 @@
 子命令::
 
     serve         --db PATH [--host 127.0.0.1] [--port 8765] [--token T]   本机 HTTP/JSON 服务
+    console       --db PATH [--host 127.0.0.1] [--port 8766] [--token T]   本机 Web 控制台（docs/CONSOLE.md）
     mcp           --db PATH                                                MCP stdio 适配器
     perceive      --db PATH TEXT [--tag T ...]                             写入一条，打印 JSON 回执
     recall        --db PATH QUERY [--limit 10]                             召回，打印 JSON
@@ -39,6 +40,8 @@ def _parser() -> argparse.ArgumentParser:
     p.add_argument("--host", default="127.0.0.1")
     p.add_argument("--port", type=int, default=8765)
     p.add_argument("--token", default=None, help="Bearer 令牌（缺省读 LINGSHU_NG_TOKEN）；绑非回环地址时必需")
+    from .console import add_arguments as _console_args
+    _console_args(add("console", "本机 Web 控制台（企业级本地 UI）"), with_db=False)
     add("mcp", "MCP stdio 适配器")
     p = add("perceive", "写入一条")
     p.add_argument("text")
@@ -77,6 +80,9 @@ def main(argv: Optional[List[str]] = None) -> int:
             sys.stderr.write(f"{e}\n")
             return 2
         return 0
+    if a.cmd == "console":
+        from .console import run as run_console
+        return run_console(a)
     if a.cmd == "mcp":
         from .mcp import run_stdio
         run_stdio(db)
