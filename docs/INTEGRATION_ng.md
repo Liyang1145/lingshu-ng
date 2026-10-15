@@ -52,6 +52,10 @@ curl -s --noproxy '*' -H "Authorization: Bearer $LINGSHU_NG_TOKEN" -d '{"content
 curl -s --noproxy '*' -H "Authorization: Bearer $LINGSHU_NG_TOKEN" -d '{"query":"发版窗口","limit":3}' http://127.0.0.1:8765/v1/recall
 ```
 
+### 2.x 本机 Web 控制台（ent-ui）
+
+`lingshu-ng console --db PATH` 启动的是同一个 HTTP 服务，额外提供浏览器管理页面，并新增 `/v1/health`、`/v1/nodes`、`/v1/nodes/<id>`（GET / DELETE）、`/v1/export`、`/v1/import`。`DELETE` 与 `import` 在任何模式下都须带 `X-Lingshu-Console: 1`；控制台模式下所有非 GET 请求都须带。写操作记 JSON 审计日志（logger `lingshu_ng.audit`）。详见 [`CONSOLE.md`](CONSOLE.md)。
+
 ## 3. MCP stdio 适配器
 
 `python -m lingshu_ng mcp --db mem.db`：stdin/stdout 上每行一条 JSON-RPC 2.0 消息（MCP stdio 传输），stdout 只出协议消息，日志走 stderr。
