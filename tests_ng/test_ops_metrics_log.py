@@ -94,6 +94,24 @@ def test_metrics_requires_auth_and_is_prometheus_text(srv):
     names = {l.split()[2] for l in txt.splitlines() if l.startswith("# TYPE")}
     for l in txt.splitlines():
         if l and not l.startswith("#"):
-            assert re.split(r"[{ ]", l, 1)[0] in names
+            base = re.split(r"[{ ]", l, 1)[0]
+            assert re.sub(r"_(bucket|sum|count)$", "", base) in names or base in names
     assert "指标测试" not in txt
     assert _req(port, "POST", "/metrics", auth, "{}")[0] == 405
+
+
+def test_latency_histogram_by_route(srv):
+    port = srv.server_address[1]
+    auth = {"Authorization": "Bearer tok-m"}
+    for _ in range(3):
+        _req(port, "POST", "/v1/perceive", auth, json.dumps({"content": "时延"}))
+    _req(port, "GET", "/v1/whatever-1", auth)
+    _req(port, "GET", "/v1/whatever-2", auth)
+    txt = _req(port, "GET", "/metrics", auth)[2].decode()
+    assert "# TYPE lingshu_ng_http_request_duration_seconds histogram" in txt
+    assert re.search(r'_count\{route="/v1/perceive"\} 3$', txt, re.M)
+    assert re.search(r'_bucket\{route="/v1/perceive",le="\+Inf"\} 3$', txt, re.M)
+    assert re.search(r'_count\{route="other"\} 2$', txt, re.M)   # 未知路径归并，基数固定
+    assert "whatever" not in txt
+    cum = [int(m) for m in re.findall(r'_bucket\{route="/v1/perceive",le="[^"]+"\} (\d+)', txt)]
+    assert cum == sorted(cum)

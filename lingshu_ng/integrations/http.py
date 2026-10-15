@@ -184,7 +184,17 @@ class _Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(data)
 
+    def _route_label(self) -> str:
+        path = self.path.split("?", 1)[0]
+        if _NODE_PATH.match(path):
+            return "/v1/nodes/{id}"
+        if path in _GET or path in _POST or path in ("/v1/health", "/metrics", "/healthz"):
+            return path
+        return "other"          # 固定基数，防标签爆炸
+
     def _tick(self) -> None:
+        self._t_req = time.monotonic()
+        self._route = self._route_label()
         tick = getattr(self.server, "_count_request", None)
         if tick is not None:
             tick()
@@ -205,6 +215,11 @@ class _Handler(BaseHTTPRequestHandler):
         cnt = getattr(self.server, "_count_response", None)
         if cnt is not None:
             cnt(code)
+        t0 = getattr(self, "_t_req", None)
+        obs = getattr(self.server, "_observe_latency", None)
+        if t0 is not None and obs is not None:
+            obs(self._route, time.monotonic() - t0)
+            self._t_req = None
         super().send_response(code, message)
 
     def _metrics(self) -> None:
@@ -465,6 +480,7 @@ class Server(ThreadingHTTPServer):
         self.console = False
         self.started_at, self._t0 = time.time(), time.monotonic()
         self.requests_total, self._recent, self._stat_lock = 0, deque(maxlen=100_000), threading.Lock()
+        self._lat = {}                   # E8-1：route → [桶累计, 计数, 总和]
         self._responses = {}             # E6-2：状态码 → 次数（/metrics）
         super().__init__((host, port), _Handler)
 
@@ -535,11 +551,23 @@ class Server(ThreadingHTTPServer):
         with self._stat_lock:
             self._responses[int(code)] = self._responses.get(int(code), 0) + 1
 
+    _LAT_BUCKETS = (0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0)
+
+    def _observe_latency(self, route, secs) -> None:
+        with self._stat_lock:
+            h = self._lat.setdefault(route, [[0] * len(self._LAT_BUCKETS), 0, 0.0])
+            for i, b in enumerate(self._LAT_BUCKETS):
+                if secs <= b:
+                    h[0][i] += 1
+            h[1] += 1
+            h[2] += secs
+
     def _metrics_text(self) -> str:
         """E6-2：``GET /metrics`` 正文（Prometheus 文本格式）。"""
         from .. import __version__
         with self._stat_lock:
             total, resp = self.requests_total, dict(self._responses)
+            lat = {k: [list(v[0]), v[1], v[2]] for k, v in self._lat.items()}
         st = self.service.status()
         out = []
 
@@ -555,6 +583,15 @@ class Server(ThreadingHTTPServer):
         metric("lingshu_ng_http_requests_total", "counter", "HTTP requests handled.", [((), total)])
         metric("lingshu_ng_http_responses_total", "counter", "HTTP responses by status code.",
                [((("code", str(c)),), n) for c, n in sorted(resp.items())])
+        out.append("# HELP lingshu_ng_http_request_duration_seconds Request latency by route.")
+        out.append("# TYPE lingshu_ng_http_request_duration_seconds histogram")
+        for r, (bk, n, sm) in sorted(lat.items()):
+            rl = _prom_escape(r)
+            for b, c in zip(self._LAT_BUCKETS, bk):
+                out.append(f'lingshu_ng_http_request_duration_seconds_bucket{{route="{rl}",le="{b}"}} {c}')
+            out.append(f'lingshu_ng_http_request_duration_seconds_bucket{{route="{rl}",le="+Inf"}} {n}')
+            out.append(f'lingshu_ng_http_request_duration_seconds_sum{{route="{rl}"}} {round(sm, 6)}')
+            out.append(f'lingshu_ng_http_request_duration_seconds_count{{route="{rl}"}} {n}')
         metric("lingshu_ng_http_rejected_busy_total", "counter", "Connections rejected with 503 (connection cap).",
                [((), self.rejected_busy)])
         metric("lingshu_ng_http_max_connections", "gauge", "Configured connection cap.", [((), self.max_conn)])
