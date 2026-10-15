@@ -1,0 +1,560 @@
+# -*- coding: utf-8 -*-
+"""retrieval · 内容检索与组合召回
+
+旧实现的缺陷类别：LIKE 预筛 + 硬截断 ``LIMIT 300``（无 ORDER BY，老记忆不可达 #35）、
+``%`` / ``_`` 当通配符（#183 ``search_content('%')`` 返回全库）、同义词按子串触发
+（#132 "EMAIL"→灵枢）、相关度分母只看查询（#82 恒饱和 1.0）、零分节点照样返回、
+SELF 快照参与竞争(#201)、召回不看置信度(#29)。
+
+不变量：
+  Q1 候选来自派生倒排表（store.textindex，写时由触发器维护，无通配符语义、无插入序截断）：
+     查询词元（正文二元组 + 「标签 ⊂ 查询」的标签项）按 df 升序（= idf 降序）展开；
+     每个已见节点按（已知命中数, 是否命中标签）分桶，桶的可证上界 < 第 limit 名的桶不精排
+     （MaxScore 式剪枝，见 :mod:`lingshu_ng.expansion`）。当未见节点与全部未精排桶的上界都低于
+     第 limit 名时停止——此时结果与暴力全库精排 (:func:`brute_force`) **逐名次相同**。
+     仅当累计倒排行数将超 :data:`BUDGET` 才停止展开新节点（``last_plan['approx']``），剩余词元
+     只对已见节点做成员判定；被舍弃的只可能是一个已展开（最稀有）词元都不含的节点——与年龄无关。
+  Q2 相关度 = 覆盖率 × (0.5 + 0.5·精确率)：同样覆盖查询时，更短、更专注的节点得分更高；
+     得分为 0 的节点永不返回。
+  Q3 同义词：中日韩词按子串触发，拉丁字母词必须整词匹配。评分只用原查询二元组（同义词
+     命中但与原查询零交集的节点得分恒为 0），故同义词不参与候选展开——它们只会挤占预算。
+  Q4 召回分 = 0.5·相关度 + 0.2·importance + 0.15·confidence + 0.15·近因（全部 ∈[0,1]）。
+  Q5 退役：带 ``archived`` 标签且 importance ≤ :data:`ARCHIVED_IMP_MAX` 的节点不进召回（旧 forget_advisor
+     「归档 = 降权、可逆」：恢复 importance 即重新可见；作者基准指出的「退役后检索泄漏旧值」由此关闭）。
+     内容检索 :meth:`Retriever.search` 仍返回它们（审计/恢复路径）。
+  Q6 矛盾两侧：入选节点若有 OPPOSITE（register_conflict 落账）边，对侧节点（未退役、可检索层）
+     紧随其后一并交付，挤出末位——矛盾已落账时不只交付一侧（「聚焦检索丢失矛盾另一侧」）。
+     写入期自动登记的矛盾（:mod:`lingshu_ng.conflict`，source_evidence = auto_*）置信度低，不插队：
+     前 :data:`AUTO_TOP` 名的自动对侧至多 :data:`AUTO_SLOTS` 条补在末位（挤出末位，所随节点保留）。
+  Q9 取代降权：被写入期检测判为「已被取代」的旧记载（auto_supersede 边的 target，且取代它的新记载未退役）
+     相关度乘 :data:`SUPERSEDED_FACTOR`——旧值仍可检索、仍作为矛盾另一侧随新值交付，只是不再与新值同列。
+  Q10 按语言路由（gen-v1，:mod:`lingshu_ng.lexical`）：以拉丁文字为主的查询（中日韩字符占比 < route_cjk）改走
+     词级通路——分词（词 + 轻量词干 + 停用词）、BM25 长度归一 + SDM 邻近（+ 可选段落项 / 写入序上下文聚合），
+     相关度 = 分数 / 池内最高分；召回第二阶段不再做二元组 idf 重排（R1），R2 是否保留由配置决定。
+     中文查询的通路与 Q1–Q9 逐位不变。``Retriever.lexical`` 为当前配置（``enabled=False`` 全部回到旧通路）。
+"""
+from __future__ import annotations
+
+import json
+import math
+import re
+from typing import Callable, Dict, Iterable, List, Optional, Sequence, Set, Tuple
+
+from .dedup import bigrams, normalize
+from . import densefuse as dfu, headrank as hd, lexical as lx
+from .layers import LayerPolicy
+from .store import Store
+from .store.schema import chunks, placeholders
+from .expansion import TAG_BONUS, Expansion, tags_of
+from .conflict import AUTO_SUPERSEDE, is_auto
+from .semindex import interleave
+from .rerank import Reranker
+from . import assoc as ax
+from .store.textindex import TAG_PREFIX
+from .types import MemoryLayer, Node, now
+from .recall_filter import ARCHIVED_IMP_MAX, _layer_values, _retired, tag_hit  # noqa: F401（stab-r1 下沉；此处再导出同一对象）
+
+__all__ = ["SYNONYM_GROUPS", "expand_terms", "score", "brute_force", "Retriever", "BUDGET"]
+
+SYNONYM_GROUPS: Tuple[frozenset, ...] = tuple(frozenset(g) for g in (
+    {"视觉", "图像", "画面", "图片", "影像", "视像"},
+    {"语义", "含义", "意思", "意义", "概念"},
+    {"识别", "检测", "感知", "探测", "发现"},
+    {"转换", "转化", "映射", "变换"},
+    {"实验", "试验", "实现", "验证", "测试"},
+    {"评测", "评估", "跑分", "基准", "benchmark", "评审", "考核"},
+    {"记忆", "记录"},
+    {"智能", "智能体", "灵枢", "AI"},
+    {"语音", "声音", "音频", "说话"},
+    {"对话", "聊天", "交流"},
+))
+#: 展开倒排的累计行数上限（超过即停止展开，见 Q1）
+BUDGET = 60000
+#: 展开下一个词元前「先精排再判完成」的最低代价额度（倒排成员点查次数；实际额度取
+#: max(REFINE_CAP, 下一词元 df/2)——点查一次约等于读两行倒排，超出额度就先展开下一个词元）
+REFINE_CAP = 400
+#: Q6 自动登记矛盾：只看前 AUTO_TOP 名入选节点的对侧，至多补 AUTO_SLOTS 条
+AUTO_TOP = 3
+AUTO_SLOTS = 2
+#: Q9 被取代旧记载的相关度系数
+SUPERSEDED_FACTOR = 0.5
+#: 查询不长于此时枚举其全部子串作标签候选；更长的查询扫描标签词表（两者都精确）
+_TAG_ENUM_MAX = 64
+
+
+def _hit(word: str, query: str) -> bool:
+    if word.isascii():
+        return re.search(rf"(?<![A-Za-z0-9]){re.escape(word)}(?![A-Za-z0-9])", query, re.I) is not None
+    return word in query
+
+
+def expand_terms(query: str) -> List[str]:
+    """Q3：原查询 + 命中组的全部同义词（去重保序）。"""
+    terms = [query]
+    for group in SYNONYM_GROUPS:
+        if any(_hit(w, query) for w in group):
+            terms.extend(sorted(group))
+    return list(dict.fromkeys(terms))
+
+
+def score(query_grams: frozenset, text: str) -> float:
+    """Q2：覆盖率 × (0.5 + 0.5·精确率)。"""
+    if not query_grams:
+        return 0.0
+    ng = bigrams(text)
+    if not ng:
+        return 0.0
+    inter = len(query_grams & ng)
+    if not inter:
+        return 0.0
+    return (inter / len(query_grams)) * (0.5 + 0.5 * inter / len(ng))
+
+
+def relevance(query: str, qg: frozenset, content: str, tags: Iterable[str]) -> float:
+    """单节点相关度（Q2 + 标签加分），检索与暴力基线共用。"""
+    s = score(qg, content or "")
+    if tag_hit(query, tags):
+        s = min(1.0, s + TAG_BONUS)
+    return round(s, 6)
+
+
+def corpus_cjk_share(store: Store) -> float:
+    """库的中日韩词元份额 Σdf(中日韩二元组) / Σdf(中日韩二元组 + 拉丁字母词元)（派生倒排块条数 n 的主键区间求和，schema v6 及以前为 term_df.df；
+    纯数字词元不计）。按库缓存，代理键上界漂移超过 2% 才重读（同 :func:`lex_stats`）。空库视为 1.0（按中文处理）。"""
+    mk = store.db.scalar("SELECT MAX(nkey) FROM node_index") or 0
+    k0, share = getattr(store.text, "_cjk_share", (-1, 1.0))
+    if k0 < 0 or abs(mk - k0) > 0.02 * max(1, k0):
+        rng = lambda lo, hi: float(store.db.scalar("SELECT COALESCE(SUM(n), 0) FROM term_blocks WHERE term >= ? AND term < ?",
+                                                   (lo, hi)) or 0)
+        cj = rng("\u3040", "\u3100") + rng("\u3400", "\u4dc0") + rng("\u4e00", "\ua000") + rng("\uf900", "\ufb00") \
+            + rng("\uac00", "\ud7b0")
+        w = rng(lx.WORD_PREFIX, lx.WORD_PREFIX + "\U0010ffff") - rng(lx.WORD_PREFIX + "0", lx.WORD_PREFIX + ":")
+        share = cj / (cj + w) if cj + w > 0 else 1.0
+        store.text._cjk_share = (mk, share)
+    return share
+
+
+def _route(store: Store, q: str, cfg: "lx.LexicalConfig") -> bool:
+    """Q10 路由：拉丁为主 ⇒ 词级；否则（route_corpus ≥ 0 时）混合查询按库的语言份额判定（v2）。"""
+    if lx.is_latin_query(q, cfg):
+        return True
+    if cfg.route_corpus < 0:
+        return False
+
+    def df_of(terms):
+        """惰性：只有查询真含中日韩 + 非数字拉丁词元时才触及派生索引。"""
+        store.text.flush()
+        return store.text.df(terms)
+
+    def share():
+        """库的中日韩词元份额（先 flush，惰性）。"""
+        store.text.flush()
+        return corpus_cjk_share(store)
+
+    # 路由判定本身无副作用：纯中文/纯数字查询不 flush、不读 df（与 v1 的执行路径逐步相同）
+    return lx.mixed_route(q, cfg, df_of, share)
+
+
+def brute_force(store: Store, query: str, layers: Optional[Sequence[MemoryLayer]] = None,
+                limit: int = 20, lexical: Optional["lx.LexicalConfig"] = None) -> List[Tuple[str, float]]:
+    """暴力全库精排（召回率基线；不走索引）：[(id, 相关度)]。拉丁查询按 Q10 词级通路对全部节点精排。"""
+    q = (query or "").strip()
+    use = _layer_values(layers)
+    cfg = lexical or lx.config_from_env()
+    if _lex_ready(store) and _route(store, q, cfg):
+        store.text.flush()
+        return lex_rank(store, q, cfg, use, limit, keys=None)[0]
+    qg = bigrams(q)
+    out = []
+    for nid, content, tags_json, imp, layer in store.db.all(
+            "SELECT id, content, tags, importance, layer FROM nodes"):
+        if layer in use:
+            s = relevance(q, qg, content, json.loads(tags_json) if tags_json else [])
+            if s > 0:
+                out.append((nid, s, imp or 0.0))
+    out.sort(key=lambda x: (-x[1], -x[2], x[0]))
+    return [(nid, s) for nid, s, _ in out[:limit]]
+
+
+from .lexpath import _lex_ready, lex_stats, lex_rank  # noqa: E402,F401（Q10 主体见 lexpath）
+
+
+class Retriever:
+    """内容检索器（只读）。``on_hit`` 回调用于访问计数/飞轮记账。"""
+
+    def __init__(self, store: Store, on_hit: Optional[Callable[[List[str]], None]] = None) -> None:
+        self.store = store
+        self.on_hit = on_hit
+        self.reranker = Reranker(store.db)
+        #: 可选第二路召回（:class:`lingshu_ng.semindex.SemanticIndex`；engine 注入，默认无）
+        self.semantic = None
+        #: 可选读路径第三阶段（:class:`lingshu_ng.neural.NeuralStage`；engine 注入，默认无 ⇒ 召回与 c2 逐项相同）
+        self.neural = None
+        #: 最近一次检索的展开计划（诊断/测试用）：terms/expanded/rows/approx（Q10 通路另有 lexical=True）
+        self.last_plan: Dict = {}
+        #: Q10 词级通路配置（默认 gen-v1 交付值，``LINGSHU_NG_LEXICAL`` 可覆盖；engine.set_lexical 可改）
+        self.lexical: lx.LexicalConfig = lx.config_from_env()
+        #: AX 联想扩展配置（zh-v1；中文通路，``LINGSHU_NG_ASSOC`` 可覆盖）
+        self.assoc: ax.AssocConfig = ax.config_from_env()
+        self.associator = ax.Associator(store, self._retrievable)
+
+    def routes_lexical(self, q: str) -> bool:
+        """该查询是否走 Q10 词级通路。"""
+        return _lex_ready(self.store) and _route(self.store, q, self.lexical)
+
+    def _ranked_lex(self, q: str, layers: Optional[Sequence[MemoryLayer]], limit: int) -> List[Tuple[str, float]]:
+        """Q10 候选展开：查询词元按 df 升序展开倒排（行数预算内），以命中词元 idf 和取前 cand_max 名精排。"""
+        cfg = self.lexical
+        text = self.store.text
+        use = _layer_values(layers)
+        if not use:
+            self.last_plan = {"lexical": True, "terms": 0, "expanded": 0, "rows": 0, "approx": False, "scored": 0}
+            return []
+        _, qtf = lx.query_terms(q, cfg)
+        df = text.df({lx.index_term(t) for t in qtf})
+        n, _ = lex_stats(self.store)
+        pre: Dict[int, float] = {}
+        rows, expanded, approx = 0, 0, False
+        for d, term in sorted((d, t) for t, d in df.items()):
+            if expanded and rows + d > cfg.budget:
+                approx = True
+                break
+            idf = math.log(1.0 + (max(1.0, n) - d + 0.5) / (d + 0.5))
+            for k, g in text.postings_g(term):
+                if g > 0:
+                    pre[k] = pre.get(k, 0.0) + idf
+            rows, expanded = rows + d, expanded + 1
+        tag_terms = list(text.df(self._tag_terms(q)))
+        for t in tag_terms:
+            for k in text.postings(t):
+                pre.setdefault(k, 0.0)
+        keys = sorted(pre, key=lambda k: (-pre[k], k))
+        if len(keys) > cfg.cand_max:
+            approx = True
+            keys = keys[:cfg.cand_max]
+        top, diag = lex_rank(self.store, q, cfg, use, limit, keys=keys)
+        self.last_plan = {"lexical": True, "terms": len(df), "expanded": expanded, "rows": rows, "approx": approx,
+                          "scored": diag["scored"], "head": diag.get("head")}     # head：gen-v3 r6 H2（headrank）
+        return top
+
+    # ------------------------------------------------------------ 候选展开
+    def _tag_terms(self, q: str) -> List[str]:
+        """满足「标签 == 查询 或 标签 ⊂ 查询」的全部标签词元（精确）。"""
+        if len(q) <= _TAG_ENUM_MAX:
+            subs = {q} | {q[i:j] for i in range(len(q)) for j in range(i + 2, len(q) + 1)}
+            return [TAG_PREFIX + t for t in subs]
+        rows = self.store.db.all("SELECT DISTINCT term FROM term_blocks WHERE term >= ? AND term < ? ORDER BY term",
+                                 (TAG_PREFIX, chr(ord(TAG_PREFIX) + 1)))
+        return [r[0] for r in rows if tag_hit(q, [r[0][1:]])]
+
+    def _plan(self, q: str, qg: frozenset) -> List[Tuple[int, str, bool]]:
+        """展开顺序：[(df, 词元, 是否标签项)]，df 升序（idf 降序）；df=0 的词元不展开。"""
+        text = self.store.text
+        order = [(d, t, False) for t, d in text.df(qg).items()]
+        order += [(d, t, True) for t, d in text.df(self._tag_terms(q)).items()]
+        return sorted(order)
+
+    def _ranked(self, q: str, layers: Optional[Sequence[MemoryLayer]], limit: int) -> List[Tuple[str, float]]:
+        """Q1：按 idf 降序展开倒排，上界剪枝精排，直到可证完成或预算耗尽（见 expansion）。
+        拉丁查询改走 Q10 词级通路（:meth:`_ranked_lex`）。"""
+        self.store.text.flush()
+        if self.routes_lexical(q):
+            return self._ranked_lex(q, layers, limit)
+        use, qg = _layer_values(layers), bigrams(q)
+        order = self._plan(q, qg) if use else []
+        hit_tags = {t[len(TAG_PREFIX):] for _, t, tag in order if tag}
+
+        def content_score(content: str, tj: str, known: Optional[bool]) -> float:
+            """单节点正文精排。标签加分：标签项已全部展开时直接用倒排结论（known），
+            否则惰性解析 JSON（无转义且不含任何命中标签子串 ⇒ 不可能加分，免解析）。"""
+            if known is None:
+                known = ("\\" in tj or any(t in tj for t in hit_tags)) and tag_hit(q, tags_of(tj))
+            s = score(qg, content or "")
+            return round(min(1.0, s + TAG_BONUS) if known else s, 6)
+
+        text = self.store.text
+        ex = Expansion(self.store.db, len(qg), text.min_grams(), use, limit, content_score,
+                       sum(1 for o in order if not o[2]), sum(1 for o in order if o[2]), member=text.members)
+        rows, expanded = 0, 0
+        for i, (d, term, tag) in enumerate(order):
+            if expanded:
+                ex.drain(max(REFINE_CAP, d // 2), order[i:])
+                if ex.unseen_cleared() and ex.pending() == 0:
+                    break
+                if rows + d > BUDGET:
+                    ex.approx = not ex.unseen_cleared()
+                    ex.settle(order[i:])
+                    break
+            ex.expand(text.postings_g(term), tag)
+            rows, expanded = rows + d, expanded + 1
+        ex.drain(0)
+        self.last_plan = {"terms": len(order), "expanded": expanded, "rows": rows, "approx": ex.approx,
+                          "scored": len(ex.done)}
+        return ex.top()
+
+    def candidates(self, query: str, layers: Optional[Sequence[MemoryLayer]] = None) -> List[Node]:
+        """候选节点（含任一查询二元组或命中标签的可检索节点；整行反序列化，仅供诊断）。"""
+        q = (query or "").strip()
+        self.store.text.flush()
+        ids = self.store.text.postings_any(sorted(bigrams(q)) + self._tag_terms(q)) if q else set()
+        use = _layer_values(layers)
+        return [n for n in self.store.nodes.get_many(sorted(ids)).values() if n.layer.value in use]
+
+    def search(self, query: str, layers: Optional[Sequence[MemoryLayer]] = None,
+               limit: int = 20, touch: bool = True) -> List[Tuple[Node, float]]:
+        """内容检索：[(节点, 相关度)]，相关度降序、同分 importance 降序、再按 id。"""
+        q = (query or "").strip()
+        if not q:
+            return []
+        top = self._ranked(q, layers, int(limit))
+        nodes = self.store.nodes.get_many([t[0] for t in top])
+        out = [(nodes[nid], s) for nid, s in top if nid in nodes]
+        if touch and out:
+            self.store.nodes.touch([n.id for n, _ in out])
+            if self.on_hit:
+                self.on_hit([n.id for n, _ in out])
+        return out
+
+    def recall(self, query: str, limit: int = 10, exclude: Set[str] = frozenset()) -> List[Tuple[Node, float]]:
+        """Q4 组合召回。``exclude`` 用于剔除负记忆命中的节点。
+
+        先按相关度取前 max(50, 5·limit) 名（同 :meth:`search`），组合分只读轻量列
+        （importance/confidence/last_access/created_at），最后只对入选的 limit 条整行反序列化。"""
+        q = (query or "").strip()
+        if not q:
+            return []
+        if self.neural is not None:
+            return self._recall_neural(q, limit, exclude)
+        pf = dfu.prefetch(self, q)        # gen r10 F3P：查询向量与词面通路并行编码（纯时延；sf = 0 或无提供者时 None）
+        hits = self._ranked(q, None, max(50, limit * 5))
+        lex = bool(self.last_plan.get("lexical"))
+        light: Dict[str, tuple] = {}
+        rows: Dict[str, tuple] = {}
+        for part in chunks([nid for nid, _ in hits]):
+            for r in self.store.db.all(f"SELECT n.id, n.importance, n.confidence, n.last_access, n.created_at, n.tags, "
+                                       f"n.content, i.grams, n.rowid FROM nodes n LEFT JOIN node_index i ON i.node_id = n.id "
+                                       f"WHERE n.id IN ({placeholders(len(part))})", part):
+                light[r[0]] = tuple(r)[1:6]
+                rows[r[0]] = (r[6], r[7], r[8])
+        # Q7（:mod:`lingshu_ng.rerank` R1）：池内 idf 重排；df 读倒排块条数之和（v6 及以前为 term_df）
+        rel = {nid: sim for nid, sim in hits if nid in light}
+        if lex:
+            sims = rel                    # Q10：词级通路已含 idf 与长度归一，不再做二元组 idf 重排
+        else:
+            sims = self.reranker.rerank(q, rel, self.store.text.df(bigrams(q)), rows) if rel else {}
+        superseded = self._superseded(list(light))
+        t = now()
+        scored = []
+        for nid, _ in hits:
+            if nid in exclude or nid not in light:
+                continue
+            imp, conf, la, created, tj = light[nid]
+            if _retired(imp, tj):
+                continue
+            sim = sims.get(nid, 0.0) * (SUPERSEDED_FACTOR if nid in superseded else 1.0)
+            la = la if la is not None else (created or t)
+            recency = 1.0 / (1.0 + max(0.0, t - la) / 86400.0)
+            scored.append((nid, round(0.5 * sim + 0.2 * (imp or 0.0) + 0.15 * (conf or 0.0) + 0.15 * recency, 6)))
+        scored.sort(key=lambda x: (-x[1], x[0]))
+        # Q8（rerank R2）：长文本块之间 MMR 多样化（短节点不受影响）
+        use_ax = not lex and self.assoc.enabled
+        if not lex or self.lexical.diversify:
+            scored = self.reranker.diversify(scored, max(limit, self.assoc.pool) if use_ax else limit, rows,
+                                             max(sims.values() or [0.0]))
+        else:
+            scored = scored[:limit]
+        if use_ax:
+            # Q11（:mod:`lingshu_ng.assoc`）：锚定局部展开 + 联想扩散（中文通路）
+            scored = self.associator.expand(q, scored, rows, self.assoc, set(exclude), limit)[:limit]
+        scored = hd.recall_stage(self, lex, scored)          # gen-v3 r6 H2 头部精排（headrank；hd_at 1，仅词级通路）
+        if self.semantic is not None:
+            if pf is not None:
+                pf.join()
+            scored = dfu.fuse(self, q, scored, limit, exclude, lex)   # gen-v3 r7 F1（sf = 0 ⇒ 原交错）
+        return self._deliver(self._with_opposites(scored[:limit], limit, exclude))
+
+    def _retrievable(self, ids) -> Set[str]:
+        """ids 中层可召回、未退役者。"""
+        ok: Set[str] = set()
+        use = _layer_values(None)
+        for part in chunks(sorted(set(ids))):
+            for nid, imp, tj, layer in self.store.db.all(
+                    f"SELECT id, importance, tags, layer FROM nodes WHERE id IN ({placeholders(len(part))})", part):
+                if layer in use and not _retired(imp, tj):
+                    ok.add(nid)
+        return ok
+
+    def _recall_neural(self, q: str, limit: int, exclude: Set[str]) -> List[Tuple[Node, float]]:
+        """N1–N3（:mod:`lingshu_ng.neural`）：混合候选池 → 三路 z 分数融合 → 写入流多样化 → Q6 对侧补全。
+        exclude / 退役 / 可检索层 / 已取代（Q9）规则与 :meth:`recall` 相同。"""
+        from .neural import fuse, stream_diversify, blend_sentence, LONG_GRAMS
+        st = self.neural
+        hits = self._ranked(q, None, max(st.pool_lex, limit))
+        cos: Dict[str, float] = {}
+        if self.semantic is not None:
+            cos = {nid: c for nid, c in self.semantic.search(q, st.pool_sem + len(exclude))}
+        pool = list(dict.fromkeys([nid for nid, _ in hits] + list(cos)))
+        use = _layer_values(None)
+        rows: Dict[str, tuple] = {}
+        for part in chunks(pool):
+            for r in self.store.db.all(f"SELECT n.id, n.content, i.grams, n.rowid, n.importance, n.tags, n.layer "
+                                       f"FROM nodes n LEFT JOIN node_index i ON i.node_id = n.id "
+                                       f"WHERE n.id IN ({placeholders(len(part))})", part):
+                if r[0] in exclude or r[6] not in use or _retired(r[4], r[5]):
+                    continue
+                rows[r[0]] = (r[1] or "", r[2] or 0, r[3])
+        pool = [nid for nid in pool if nid in rows]
+        if not pool:
+            return []
+        texts = {nid: normalize(rows[nid][0]) for nid in pool}
+        lex = self.reranker.bm25(sorted(bigrams(q)), self.store.text.df(bigrams(q)), texts,
+                                 {nid: rows[nid][1] for nid in pool})
+        sem = None
+        if self.semantic is not None:
+            missing = [nid for nid in pool if nid not in cos]
+            if missing:
+                cos.update(self.semantic.similarity(q, missing))
+            sem = {nid: cos[nid] for nid in pool if nid in cos} or None
+        scope = pool
+        if st.cross is not None and 0 < st.cross_top < len(pool):
+            pre = fuse(pool, lex, sem, None)
+            scope = sorted(pool, key=lambda i: (-pre[i], rows[i][2] if rows[i][2] is not None else 0, i))[:st.cross_top]
+        cross = st.cross_scores(q, {nid: rows[nid][0] for nid in scope})
+        if sem and cross is not None and st.ws > 0 and self.semantic is not None:
+            sem = blend_sentence(sem, self.semantic.sentence_similarity(q, list(sem)), st.ws)
+        fused = fuse(pool, lex, sem, cross, st.a_cross)
+        for nid in self._superseded(pool):          # Q9：被取代的旧值降一个标准差，仍可随新值交付
+            if nid in fused:
+                fused[nid] -= 1.0
+        seq = {nid: rows[nid][2] for nid in pool}
+        order = sorted(pool, key=lambda i: (-fused[i], seq[i] if seq[i] is not None else 0, i))
+        longs = {nid for nid in pool if rows[nid][1] >= LONG_GRAMS}
+        picked_ids = stream_diversify(order, fused, seq, longs, limit, st.span, st.pen)[:limit]
+        st.last = {"pool": len(pool), "lex": len(hits), "sem": len(cos), "cross": cross is not None,
+                   "sent": bool(sem) and cross is not None and st.ws > 0}
+        ranked: List[Tuple[str, float]] = []
+        for nid in picked_ids:                       # 分数：logistic(融合分)，按输出序非增
+            s_ = round(1.0 / (1.0 + math.exp(-fused[nid])), 6)
+            ranked.append((nid, min(s_, ranked[-1][1]) if ranked else s_))
+        return self._deliver(self._with_opposites(ranked, limit, exclude))
+
+    def _deliver(self, picked: List[Tuple[str, float]]) -> List[Tuple[Node, float]]:
+        """取节点、记命中（touch / on_hit），按 picked 顺序交付。"""
+        nodes = self.store.nodes.get_many([nid for nid, _ in picked])
+        top = [(nodes[nid], s) for nid, s in picked if nid in nodes]
+        if top:
+            self.store.nodes.touch([n.id for n, _ in top])
+            if self.on_hit:
+                self.on_hit([n.id for n, _ in top])
+        return top
+
+    def _fuse_semantic(self, q: str, scored: List[Tuple[str, float]], limit: int,
+                       exclude: Set[str]) -> List[Tuple[str, float]]:
+        """S3：词面名次与语义名次按 semindex.PATTERN 交错；语义候选过 exclude / 退役 / 可检索层过滤。
+        语义入选者的分数取前一名的分数（保持非增；居首且无词面命中时取 0.5·余弦）。"""
+        cos = {nid: c for nid, c in self.semantic.search(q, 2 * limit + len(exclude)) if nid not in exclude}
+        sem = list(cos)
+        ok: Set[str] = set()
+        use = _layer_values(None)
+        for part in chunks(sem):
+            for nid, imp, tj, layer in self.store.db.all(
+                    f"SELECT id, importance, tags, layer FROM nodes WHERE id IN ({placeholders(len(part))})", part):
+                if layer in use and not _retired(imp, tj):
+                    ok.add(nid)
+        sem = [nid for nid in sem if nid in ok]
+        if not sem:
+            return scored
+        sc = dict(scored)
+        out: List[Tuple[str, float]] = []
+        for nid in interleave([nid for nid, _ in scored], sem, limit):
+            s_ = sc.get(nid)
+            floor = out[-1][1] if out else max(sc.values() or [round(0.5 * max(0.0, cos.get(nid, 0.0)), 6)])
+            out.append((nid, floor if s_ is None else min(s_, floor)))
+        return out
+
+    def _superseded(self, ids: List[str]) -> Set[str]:
+        """Q9：ids 中被未退役的新记载取代（auto_supersede 边的 target）的节点。"""
+        out: Set[str] = set()
+        src: Dict[str, List[str]] = {}
+        for part in chunks(ids):
+            for s_, t_ in self.store.db.all(
+                    f"SELECT source_id, target_id FROM edges WHERE target_id IN ({placeholders(len(part))}) "
+                    f"AND relation_type='opposite' AND source_evidence=?", [*part, AUTO_SUPERSEDE]):
+                src.setdefault(s_, []).append(t_)
+        if not src:
+            return out
+        for part in chunks(sorted(src)):
+            for nid, imp, tj in self.store.db.all(
+                    f"SELECT id, importance, tags FROM nodes WHERE id IN ({placeholders(len(part))})", part):
+                if not _retired(imp, tj):
+                    out.update(src[nid])
+        return out
+
+    def _with_opposites(self, ranked: List[Tuple[str, float]], limit: int,
+                        exclude: Set[str]) -> List[Tuple[str, float]]:
+        """Q6：手工登记的 OPPOSITE 对侧紧随其后（分数取所随节点的分数，保持非增），截断到 limit；
+        自动登记的对侧（前 AUTO_TOP 名的）至多 AUTO_SLOTS 条补在末位。"""
+        ids = [nid for nid, _ in ranked]
+        if not ids:
+            return ranked
+        partner: Dict[str, List[str]] = {}
+        auto: Dict[str, List[str]] = {}
+        for part in chunks(ids):
+            ph = placeholders(len(part))
+            for s_, t_, ev in self.store.db.all(
+                    f"SELECT source_id, target_id, source_evidence FROM edges WHERE relation_type='opposite' AND "
+                    f"(source_id IN ({ph}) OR target_id IN ({ph}))", [*part, *part]):
+                d = auto if is_auto(ev) else partner
+                d.setdefault(s_, []).append(t_)
+                d.setdefault(t_, []).append(s_)
+        if not partner and not auto:
+            return ranked
+        have = set(ids)
+        want = sorted({p for d in (partner, auto) for nid in ids for p in d.get(nid, ())
+                       if p not in have and p not in exclude})
+        ok: Set[str] = set()
+        use = _layer_values(None)
+        for part in chunks(want):
+            for nid, imp, tj, layer in self.store.db.all(
+                    f"SELECT id, importance, tags, layer FROM nodes WHERE id IN ({placeholders(len(part))})", part):
+                if layer in use and not _retired(imp, tj):
+                    ok.add(nid)
+        out: List[Tuple[str, float]] = []
+        seen: Set[str] = set()
+        for nid, sc in ranked:
+            if nid in seen:
+                continue
+            out.append((nid, sc))
+            seen.add(nid)
+            for p in sorted(partner.get(nid, ())):
+                if p in ok and p not in seen:
+                    out.append((p, sc))
+                    seen.add(p)
+        return _auto_tail(out[:limit], auto, ok, limit)
+
+
+def _auto_tail(out: List[Tuple[str, float]], auto: Dict[str, List[str]], ok: Set[str],
+               limit: int) -> List[Tuple[str, float]]:
+    """Q6 自动登记部分：前 AUTO_TOP 名的自动对侧至多 AUTO_SLOTS 条补在末位（挤出末位，所随节点不被挤出），
+    分数取保留部分的末位分（保持非增）。"""
+    if not auto:
+        return out
+    seen = {nid for nid, _ in out}
+    adds: List[Tuple[str, int]] = []
+    for i, (nid, _) in enumerate(out[:AUTO_TOP]):
+        for p in sorted(auto.get(nid, ())):
+            if p in ok and p not in seen and all(p != a for a, _ in adds):
+                adds.append((p, i))
+    head, tail = list(out), []
+    for p, i in adds[:AUTO_SLOTS]:
+        if len(head) + len(tail) < limit:
+            tail.append(p)
+        elif len(head) - 1 > i:
+            head.pop()
+            tail.append(p)
+        else:
+            break
+    floor = head[-1][1] if head else 0.0
+    return head + [(p, floor) for p in tail]
+
+

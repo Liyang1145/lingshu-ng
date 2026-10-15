@@ -1,0 +1,41 @@
+# Liyang/ 发布目录的打包定义（stab-r3 #3）：可安装的发行包是 lingshu_ng（灵枢记忆引擎重写版）。
+# 源文件：wt-stab release/Liyang/pyproject.toml，发布时复制为 Liyang/pyproject.toml。
+# rel-v1.17 及以前本文件沿用上游 lingshu 身体侧包定义（name="lingshu"，同时装入旧包副本 lingshu/）；
+# 自 rel-v1.18 起只打包 lingshu_ng，旧包副本 lingshu/ 只用于仓内差分测试，不进发行包（避免与上游 lingshu 冲突）。
+[build-system]
+requires = ["setuptools>=77"]  # PEP 639 SPDX license 字符串
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lingshu-ng"
+dynamic = ["version"]          # 唯一来源：lingshu_ng.__version__（= CHANGELOG_rel-vX.Y 的 X.Y.0）
+description = "灵枢记忆引擎重写版（lingshu_ng）：零 LLM 写入、原文召回、零外部依赖；本地 ONNX 语义件等见插件包 lingshu-ng-embed / -world / -nn / -gen"
+readme = "README.md"
+requires-python = ">=3.11"     # 实测 3.11 / 3.12 / 3.13（tools/ci/multi_python.sh）
+license = "MIT"
+license-files = ["LICENSE"]
+dependencies = []              # 核心纯标准库：不装任何 extras 即可构造引擎、写入、召回
+
+[project.scripts]
+# stab-r6：命令行入口（等同 python -m lingshu_ng），子命令 serve / mcp / perceive / recall / status / capabilities / version
+lingshu-ng = "lingshu_ng.integrations.cli:main"
+
+# split-r1（rel-v1.24）：不再有 optional-dependencies（embed / world / nn / gen / full 已删除）。
+# 依赖第三方库的部分是独立插件包，依赖写在各自包里（Liyang/plugins/lingshu-ng-*/pyproject.toml）：
+#   pip install lingshu-ng-embed   # 交叉编码重排 / 稠密向量（numpy、onnxruntime、tokenizers）
+#   pip install lingshu-ng-world   # lingshu_ng.world.*（numpy、Pillow）
+#   pip install lingshu-ng-nn      # lingshu_ng.nn.*（numpy、Pillow）
+#   pip install lingshu-ng-gen     # lingshu_ng.gen.*（numpy、Pillow、lingshu-ng-nn）
+# 插件经入口点组 lingshu_ng.plugins 被核心发现（lingshu_ng.plugins）。
+
+[project.urls]
+Source = "https://github.com/Liyang1145/lingshu-ng"
+Upstream = "https://github.com/FuRongJun-1999/lingshu"
+Origin = "https://github.com/TanPowasd/LingShu-prime/tree/main/Liyang"
+
+[tool.setuptools.dynamic]
+version = { attr = "lingshu_ng.__version__" }
+
+[tool.setuptools.packages.find]
+include = ["lingshu_ng", "lingshu_ng.*"]
+exclude = ["lingshu_ng.*.__pycache__"]

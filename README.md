@@ -1,0 +1,438 @@
+# Liyang · lingshu_ng（灵枢重写版）
+
+> **插件测评站**（另一条工作线）：见 [`plugin-eval-site/`](plugin-eval-site/README.md) —— 方案 v3.0 端到端验证结果、判分器缺陷与 v2 候选、多场景考卷 C。
+
+> **2026-10-15 增量升级 rel-v1.30（当前版本）：常驻内存——分词缓存改存紧凑串、二元组缓存只存规范化串（无库结构变化，schema 仍 v7；公开 API 不变）**。**先写未胜项**：库体积仍大于上游（10k 17.47 对 6.77 MB）、晋升仍约为上游 12–15 倍、冷 import 有缓存 31.2 对 27.6 ms，本版均未改；perf_bench 口径 1k / 10k 峰值已贴建语料地板（再改小读不出来）；与上游的内存比较为跨日记录值，非同日交替测；召回变快的原因未做对照实验（推测为 GC 跟踪对象减少）；Windows 真机未测。**读数**（零模型，B / A = v1.30 / v1.29）：vs_runtime 常驻内存 1k / 10k 34.8 / 65.4 → 20.8 / 33.15 MB（0.598× / 0.507×；上游记录 26.3 / 50.2 MB）；perf_bench 峰值 1k / 10k / 100k 0.95× / 0.82× / 0.707×；召回 p95 1.003× / 0.873× / 0.940×；写入 0.976× / 0.961× / 0.987×；晋升 1.011× / 0.977×；冷 import 1.008×（无缓存）/ 0.991×（有缓存）。召回（10k / 100k 各 240 / 240）、写入、晋升 23 项对 rel-v1.29 逐值相同。详见 [`CHANGELOG_rel-v1.30.md`](CHANGELOG_rel-v1.30.md)。
+>
+> **2026-10-14 增量升级 rel-v1.29：库体积——删除派生表 `term_df`、倒排块 grams 1 字节窄编码（库结构 schema v6 → v7；公开 API 只有常量 `SCHEMA_VERSION` 6 → 7）**。**先写未胜项**：100k 召回 p95 1.072×（189.4 → 202.9 ms）、写入末 5 段每千条 1.068×（3.83 → 4.09 s），都在门内但代价随规模增长（1k、10k 召回 0.98–1.01×）；旧库迁移到 v7 后文件不缩小（释放的页留作以后写入复用，只有新建库变小）；常驻内存未改（10k 65.45 MB，1.001×，上游 50.2 MB）；**rel-v1.18–v1.28 拒开 v7 库**（`SchemaTooNewError`，库不被改动；降级请先 `export_all` 再用旧版本 `import_all`）；库体积仍大于上游（10k 17.47 对 6.77 MB）；冷 import 有缓存仍高于上游；晋升仍约为上游 12–15 倍；Windows 真机未测。**读数**（零模型，ABBA 中位，B / A = v1.29 / v1.28）：新建库 perf_bench 1k / 10k / 100k 2.86 / 21.24 / 171.98 → 2.29 / 17.47 / 149.94 MB（0.801× / 0.823× / 0.872×）；1k / 10k 召回 ≤1.009×、写入总耗时 0.894× / 0.857× / 0.987×（100k）；晋升 0.958× / 0.948×；冷 import ≤1.032×。召回（10k / 100k 各 240 / 240）、写入规范化内容（含解码倒排与词元 df）、晋升全表对 rel-v1.28 逐值相同。v6 → v7 迁移耗时 10k 约 3.5 s、100k 约 50 s（2 核）。详见 [`CHANGELOG_rel-v1.29.md`](CHANGELOG_rel-v1.29.md)、[`docs/STABILITY_ng.md`](docs/STABILITY_ng.md) §4。
+
+> **2026-10-14 增量升级 rel-v1.28：冷 import 延迟加载（无库结构变化，公开 API 不变）**。`import lingshu_ng.compat` 不再载入存储层 / 检索层（含 `sqlite3`），改在第一次构造引擎时载入；`compat` 旧版顶层再导出的 17 个名字改为首次访问时载入（PEP 562，取到同一对象）。新增守卫：导入后 `sys.modules` 不得出现指定重模块。召回（10k / 100k 各 240 / 240）、写入库哈希（10k / 100k）、晋升全表（1k / 10k 各 23 表）对 rel-v1.27 逐值相同。**读数**（9 次中位，三轮 ABBA，B / A）：冷 import 无缓存 146.8–149.4 → 56.1–58.5 ms（0.384–0.394×），有缓存 51.9–54.9 → 30.1–32.0 ms（0.581–0.586×）；召回 / 写入 ≤1.062×，晋升 1.004× / 1.014×。**先写未胜项**：有缓存冷 import 仍高于上游（30–32 ms 对 27.6 ms）；import 加第一次构造的合计耗时未降（约 63 ms，只 import 不构造的场景才省）；晋升仍约为上游 12–15 倍；写入仍随规模变慢；常驻内存与库体积不变；Windows 真机未测。行为差别（sqlite3 不可用时改为构造时报错等）见 [`CHANGELOG_rel-v1.28.md`](CHANGELOG_rel-v1.28.md)。
+
+> **2026-10-14 增量升级 rel-v1.27：晋升路径的精确等价优化（无库结构变化，公开 API 不变）**。倒排改写合并为 `lingshu_ng/store/blockmove.py`（换键 / 同键一次完成，块不变的词元跳过），`_move_row` 与 `negative.check` 改走主键范围 / 已有索引；新增守卫：晋升路径查询计划不得出现数据表全表扫描。晋升后全部表（1k / 10k 各 23 表）、写入库哈希（10k / 100k）与召回（10k / 100k 各 240 / 240）对 rel-v1.26 逐值相同。**读数**（零模型，`tools/compare/vs_runtime.py` ABBA×2 中位，B / A）：晋升 1k 3.75 → 2.40 ms（0.640×）、10k 4.595 → 2.935 ms（0.639×）；召回 p95 / p50 / 长请求 p95 与写入 1k–100k 均 ≤1.003×。**先写未胜项**：晋升仍约为上游 12–15 倍（上游 0.19–0.20 ms），10k 仍比 1k 慢约 0.5 ms；冷 import 未改（约 150 / 54 ms，上游 80.6 / 27.6 ms）；写入仍随规模变慢；常驻内存与库体积不变；Windows 真机未测。详见 [`CHANGELOG_rel-v1.27.md`](CHANGELOG_rel-v1.27.md)。
+
+> **2026-10-14 增量升级 rel-v1.26：写入与晋升的精确等价优化（无库结构变化，公开 API 不变）**。近重复候选拆到 `lingshu_ng/store/neardup.py` 降常数、倒排块删除按位置切字节；写入结果（去重判定、节点、派生索引）与召回结果对 rel-v1.25 逐值相同（冻结墙钟 10k、100k 各 240 / 240；规范化库内容哈希 10k / 100k 相同）；检索、版本链、中文、gen（含带模型 lmelp(s)_dev 110/110）门、schema 兼容矩阵见 CHANGELOG。**读数**（零模型，100k，ABBA 两轮各 2 + 2 次中位，B / A）：写入末 5 段每千条 4.49 → 3.57 s（0.795×）、第二轮 4.52 → 3.68 s（0.814×）；写入总耗时 0.863× / 0.855×；召回 p95 / p50 / 中文长请求 p95 均 ≤1.0×；1k、10k 写入持平（0.997×、1.000×）。**先写未胜项**：冷 import 未改善（约 150 / 54 ms，上游 80.6 / 27.6 ms）；晋升延迟 1k −13.6%、10k −22.8%，仍约为上游 20 倍；写入仍随规模变慢（100k 首段约 1.6 s、末段约 3.6 s 每千条）；常驻内存与库体积不变；Windows 真机未测。详见 [`CHANGELOG_rel-v1.26.md`](CHANGELOG_rel-v1.26.md)。
+
+> **2026-10-14 增量升级 rel-v1.25：去掉 `node_index.terms` 冗余词元（库结构 schema 5 → 6）**。不含检索 / 版本链调优，召回结果对 rel-v1.24 逐题相同（冻结墙钟，10k、100k 各 240 / 240）；检索、版本链、中文、gen（含带模型 lmelp(s)_dev 110/110）门见 CHANGELOG。**升级须知**：`SCHEMA_VERSION` 5 → 6，旧库首次打开自动迁移并整体重建派生索引（实测 10k 约 4 秒、100k 约 66 秒）；v6 库不能再用 rel-v1.18–v1.24 打开（`SchemaTooNewError`），降级请先 `export_all`；分词指纹（Unicode 版本 + 分词探针）变化时打开库也会整体重建。**先写未胜项**：100k 中文长请求 limit 50 p95 未改善（88.5 → 89.2 ms，1.009×）；常驻内存不变；写入只是持平（10k 0.97×、100k 0.98×，写入非线性未修）；1k 本版未测；v7.1 档未复跑；Windows 真机未测。**读数**（零模型，ABBA 中位，B / A）：库文件 10k 28.7 → 21.3 MB（−25.9%）、100k 246.7 → 172.2 MB（−30.2%）；召回 p95 10k 0.85×、100k 0.92×，p50 10k 0.92×、100k 0.99×。v6 首版曾使写入 10k 1.18×、100k 2.24×（每次写入全扫 `node_index` 的查询计划），本版改为 CROSS JOIN 固定外表后压回，并加查询计划回归单测。详见 [`CHANGELOG_rel-v1.25.md`](CHANGELOG_rel-v1.25.md)、[`docs/STABILITY_ng.md`](docs/STABILITY_ng.md) §4。
+
+> **2026-10-14 增量升级 rel-v1.24：拆包——核心零外部依赖，依赖第三方库的部分拆为 4 个独立插件包**。`pip install lingshu-ng` 即零依赖核心（写入、召回、版本链、兼容门面、集成面）；本地 ONNX 语义件改装 `lingshu-ng-embed`，世界线 / 蜂窝 CNN / 文生图改装 `lingshu-ng-world` / `lingshu-ng-nn` / `lingshu-ng-gen`（源码在 [`plugins/`](plugins/)，各有 pyproject、版本、README、测试）。核心经入口点组 `lingshu_ng.plugins` 发现插件（也支持显式注册，协议用 `typing.Protocol`），`capabilities()` 新增 `plugins` 键；没装插件时逐位退回无模型档并打一次 WARNING 提示该装哪个包。旧导入路径不变：`lingshu_ng.semrank` / `lingshu_ng.embed` 留在核心（纯标准库部分），模型类委托插件；`lingshu_ng.world.*` 等由兼容入口按旧名载入插件目录（模块名、`__module__` 不变，源码逐字未改）。新增 AST 守卫：核心 `lingshu_ng/` 下出现任何非标准库导入（含函数内延迟导入与 `import_module` 字面量）即失败——拆包前 43 个文件依赖 numpy / PIL / onnxruntime / tokenizers，现为 0。**不兼容点**：extras（`[embed]` `[world]` `[nn]` `[gen]` `[full]` `[dev]`）已删除，旧命令只给警告、不再装第三方包，请改装插件包；`capabilities()["dependencies"]` 只列已装插件声明的依赖；未装插件时 `from lingshu_ng.embed import OnnxEmbedder` 抛 `PluginMissingError`（`ImportError` 子类）。读数：核心 + 全部插件 3298 passed；纯核心 1753 passed / 27 skipped；最小 venv 2117 passed / 58 skipped；无 onnxruntime / DLL 坏 / 无模型各 3287 passed / 8 skipped；py3.11.17 / 3.13.5 各 3287 passed / 8 skipped；打包核心 3 个解释器 + 插件 5 组干净 venv 全过；检索 / 版本链 / 中文 / gen 门对 rel-v1.23 逐项逐题相同（带模型 lmelp(s)_dev 110/110）。 迁移指引与不兼容点详见 [`CHANGELOG_rel-v1.24.md`](CHANGELOG_rel-v1.24.md)。
+
+> **2026-10-14 增量升级 rel-v1.23：倒排分块 blob（库结构 schema 4 → 5）· 长请求回退以块缓存压回**。不含检索 / 版本链调优，召回结果对 rel-v1.22 逐题相同（100k 冻结墙钟 240 / 240），检索、版本链、中文门见 CHANGELOG。**升级须知**：`SCHEMA_VERSION` 4 → 5，旧库首次打开自动迁移并整体重建派生索引（100k 条约 1 分 42 秒）；v5 库不能再用 rel-v1.18–v1.22 打开（`SchemaTooNewError`），降级请先 `export_all`。**先写未胜项**：库体积只在大库上降够——100k −20.9%（311.7 → 246.7 MB）、10k −11.2%、1k −1.9%，仍约为上游 cb3a6ea 的 3.6–4.4 倍；1k 写入慢约 6%（ABBA 中位 1.49 → 1.59 s）；写入非线性、冷 import / 内存 / 晋升延迟未动；v7.1 档本版未复跑 100k；Windows 真机未测。**读数**（零模型，ABBA 中位，B / A）：100k 召回 p95 236.7 → 200.9 ms（0.85×）、p50 39.0 → 33.7 ms、中文长请求 limit 50 p95 94.7 → 89.1 ms、写入 405.6 → 366.0 s；10k 召回 p95 0.94×、写入持平。stab-r7 的 v5 首版曾使 100k p50 +13%、长请求 p95 +16%，根因是判定精排的成员点查反复定位解码同一批块，本版加按词元缓存块区间（令牌随任何写入失效）后压回。另修迁移重建时的清表顺序（不残留陈旧墓碑）。详见 [`CHANGELOG_rel-v1.23.md`](CHANGELOG_rel-v1.23.md)、[`docs/STABILITY_ng.md`](docs/STABILITY_ng.md) §4。
+
+> **2026-10-13 增量升级 rel-v1.22：命令行 / HTTP / MCP 集成面 · 版本与弃用策略 · 召回 p95 回退修复**。不含检索 / 版本链调优，检索、版本链、中文门对 rel-v1.21 逐项、逐题相同；库结构版本不变（schema 4）。**先写未胜项**：库文件体积**未改**，仍约为上游 cb3a6ea 的 4.5 倍——本版只做了原型（倒排按词元分块打包 blob 可使 100k 全库约 −20.7%，但需整套重写触发器维护的派生索引，未采用；词元整数 id 反而更大）；为修 p95，常驻内存回升（零模型 100k 144 → 179 MB，rel-v1.20 为 209 MB）；写入非线性未修（100k 末段每千条 4.85 s）；Windows 真机未测，MCP 未与具体客户端实机联调。**修复**：rel-v1.21 的 100k 召回 p95 261 ms 经 ABBA 各 3 次复核为真回退（rel-v1.20 约 210 ms、rel-v1.21 约 245 ms），原因是分词缓存 16384 → 4096，已恢复（本版 203–204 ms）。**新增（可选、纯标准库）**：`python -m lingshu_ng` / `lingshu-ng` 命令行，本机 HTTP/JSON 服务（缺省只绑 127.0.0.1，绑外网须令牌），MCP stdio 适配器，见 [`docs/INTEGRATION_ng.md`](docs/INTEGRATION_ng.md)；版本号规则、弃用流程、schema 前后兼容矩阵（实测）与公开 API 清单见 [`docs/STABILITY_ng.md`](docs/STABILITY_ng.md)，公开签名有变化时快照测试失败。更正：rel-v1.21 所写「v4 库不能再用 rel-v1.20 及更早版本打开」只对 rel-v1.18–v1.20 成立，rel-v1.17 及更早不检查版本。详见 [`CHANGELOG_rel-v1.22.md`](CHANGELOG_rel-v1.22.md)。
+
+> **2026-10-13 增量升级 rel-v1.21：晋升延迟 · 内存 · 冷 import · 孤儿模块 · 写入剖析**。不含检索 / 版本链调优，检索、版本链、中文门对 rel-v1.20 逐项、逐题相同。**先写未胜项**（对上游 cb3a6ea 同口径，同机 2 核、ng 零模型）：库文件体积仍约为上游的 4.5 倍（10k 32.3 vs 6.8 MB，未变；多出的是自建倒排与反查索引）；冷 import 兼容门面 154.5 → 135.5 ms（上游 80 ms）、常驻内存峰值 10k 96.1 → 57.0 MB（上游 50.2 MB）、晋升延迟 3.7–4.3 → 2.2–2.3 ms/次（上游 0.2 ms）——有改善但**仍未胜**；**写入非线性未修**（库 100k 时每千条 5.0 s，首段 1.5 s），试过的分桶剪枝无收益已撤回，剖析见 [`docs/PERF_ng.md`](docs/PERF_ng.md)。公平口径孤儿模块 8 → 0（上游 3），此项已不劣于上游。**升级须知：库结构版本 schema_version 3 → 4**（新增触发器 `trg_index_upd`，旧库打开时自动迁移；v4 库不能再用 rel-v1.20 及更早版本打开）；移除无引用模块 `lingshu_ng.compat_condition_normalize`（改用 `lingshu_ng.perception.conditions`）。更正：此前文档把 ng 的倒排写成「FTS5」有误，ng 用的是自建倒排表，未用 SQLite FTS5。照实：Windows 真机未测；占位 45 个、扩展面 28 项未完成。详见 [`CHANGELOG_rel-v1.21.md`](CHANGELOG_rel-v1.21.md)、[`docs/VS_UPSTREAM_cb3a6ea.md`](docs/VS_UPSTREAM_cb3a6ea.md)。
+
+> **2026-10-13 增量升级 rel-v1.20：规模 · 输入安全 · 易用性 · 与上游同口径对照**。不含检索 / 版本链调优，检索、版本链、中文门对 rel-v1.19 逐项、逐题相同。修崩溃：v7.1 档问句超过交叉编码器 max_len 个 token 时（limit > 15 的超长中文请求）分词抛 `Truncation error`，现仅此情形截问句打分，其余输入分词逐位相同；公开 API 模糊测试与修复（孤立代理码位先判 `ValueError`、limit 上限 100000、查询超 4096 字符截断并一次 WARNING）；常见误用给可操作报错（`DatabaseOpenError` / `DatabaseLockedError` / `EngineClosedError`，均为 sqlite3 异常子类）；`verify_promotion` 返回 bool（与上游同形）；近重复候选剪枝使 100k 写入 1056.7 s → 365.4 s；新增 [`examples/`](examples/)、`tools/perf`、`tools/compare`。性能读数见 [`docs/PERF_ng.md`](docs/PERF_ng.md)，与上游 cb3a6ea 同口径对照见 [`docs/VS_UPSTREAM_cb3a6ea.md`](docs/VS_UPSTREAM_cb3a6ea.md)——其中 ng 不如上游的项：公平口径孤儿模块 8 vs 3、冷 import 兼容门面 147 vs 72–76 ms、内存与库体积更大、晋升延迟 3.7–4.3 vs 0.2 ms，HMB excl 不显著。更正此前对外材料：ng 函数 >100 行为 **4 个**（不是 1 个），最大文件为 `chain/ledger.py` **793 行**（不是 703 行）。照实：Windows 真机未测；占位 45 个、扩展面 28 项未完成；写入仍非线性（库 100k 时每千条 4.8 s）；v7.1 档中文长请求在 2 核上冷查询约 1.8 s/题。详见 [`CHANGELOG_rel-v1.20.md`](CHANGELOG_rel-v1.20.md)。
+
+> **2026-10-13 增量升级 rel-v1.19：semrank 缺省模型目录**。未设 `LINGSHU_NG_SEM` 时模型根目录由作者开发机路径改为 `~/.cache/lingshu_ng/models`，并在进程内打一次 WARNING（同时登记 `diag.fallbacks()["sem_model_dir_default"]`，写明目录及是否存在）；以前在别的机器上是静默退回无模型。设了 `LINGSHU_NG_SEM`（含 `off`）行为不变。检索 / 版本链 / 中文门读数对 rel-v1.18 逐项、逐题相同。照实：Windows 真机未测。详见 [`CHANGELOG_rel-v1.19.md`](CHANGELOG_rel-v1.19.md)。
+>
+> **2026-10-13 增量升级 rel-v1.18：确定性 · 不支持方法语义 · 打包 · 数据安全 · API 文档**。不含检索 / 版本链调优，检索与版本链指标只作持平门（见 CHANGELOG 回归门）。节点 / 边 id 改为按写入序单调（`lingshu_ng/ids.py`），同分候选「先写入者在前」，版本链与 gen 评测逐题名次不再随运行变化；45 个不支持的兼容方法统一为「返回上游缺省值 + 首次 WARNING」，`LINGSHU_NG_STRICT_UNSUPPORTED=1` 改为抛 `NotSupportedError`，兼容矩阵真实覆盖 **215/260**；发行包改名 **lingshu-ng 1.18.0**，只含 `lingshu_ng`，**不再安装旧 `lingshu/` 包**；库 schema 版本可查，库比代码新时拒绝打开（`SchemaTooNewError`）；新增 API 文档 [`docs/API_ng.md`](docs/API_ng.md)。行为变更：`wm_simloop` / `world_generator` / `world_semantics` 改为返回状态字典，`adjust_attention_weight` 返回 False，`resolve_crisis` 先校验密钥。读数：gen loc_dev r@5 +1 题、r@10 −1 题（p=1），T2Ranking 误用 1 题之差（p=1），其余门逐项相同。照实：semrank 缺省模型目录仍是作者本机路径（rel-v1.19 已修）；Windows 真机未测；占位 45 个、扩展面 28 项未完成。详见 [`CHANGELOG_rel-v1.18.md`](CHANGELOG_rel-v1.18.md)。
+>
+> **2026-10-13 增量升级 rel-v1.17：依赖结构 · 兼容覆盖 · 多 Python 版本**。不含检索 / 版本链调优，检索与版本链指标对 rel-v1.16 持平（见 CHANGELOG 回归门）。chain/ 内 5 对直接双向依赖清零（共享正则与取值函数逐字下沉 `chain/common`，原名再导出同一对象），`lingshu_ng` 全包直接双向依赖 0 对；兼容门面语义 / 注意力 / 视觉提供者注入 13 个方法由占位转为真实实现（注入后委托，未注入退回值同上游），兼容矩阵真实覆盖 198→**211/260（81.2%）**、占位 62→49；矩阵另计上游 `lingshu.core` 其余 5 个公开模块 28 项（单独汇总：缺失 27、部分 1，照实未实现）；新增 `tools/ci/multi_python.sh`，Python 3.11 / 3.13 各 3116 passed、3 skipped、0 failed。照实：Windows 真机未测；占位仍 49 个。详见 [`CHANGELOG_rel-v1.17.md`](CHANGELOG_rel-v1.17.md)。
+>
+> **2026-10-13 增量升级 rel-v1.16：稳定性 · 可复跑 · 兼容性**。不含检索 / 版本链调优，检索与版本链指标对 rel-v1.15 逐项、逐题相同（持平门）。修复粗时钟（Windows 约 15.6 ms）下取「最新帧」可能取错的缺陷（同时间戳按写入序断开）；新增 `capabilities()` 报告可选依赖 / 模型件 / 中文语义通路实际档位与退回，每类退回打一次 WARNING；全包 34 处静默宽 except 改为记日志；非 chain 部分直接双向依赖 3→0；测试间单例 / 环境变量 / 时钟污染隔离，可选依赖导入期异常（如 DLL 被拒）改报 skip，最小环境（只装 pytest）可复跑；兼容门面补上游当前 API 缺口，兼容矩阵 `COMPAT_MATRIX.md`：上游 `core.core` / `core.activation` / `core.longterm_gate` 260 个公开方法，签名覆盖 260/260，**真实覆盖 198/260（76.2%）、占位 62**。照实：Windows 真机与 Python 3.11 / 3.13 未实测（Windows 项为模拟环境读数）；chain/ 内 5 对双向依赖仍在；版本链尾部名次运行间不完全确定（新旧代码都有，指标不受影响）。复跑前置条件与预期读数见 §3「复跑说明」；详见 [`CHANGELOG_rel-v1.16.md`](CHANGELOG_rel-v1.16.md)。
+>
+> **2026-10-13 增量升级 rel-v1.15**：带 bge 语义模型时说话人先验重排窗口 `sp_n` 20→40（只改一个常数；无模型路径逐位不变）。H-CM11（ConvoMem 未用文件，801 题）上 r@25 W0 .9320→.9519（27 胜 0 负）、W1 .9282→.9407（17:0），all@25 W0 .8851→.9189（27:0）、W1 .8851→.9039（15:0），四项 Holm 显著；**r@5 / r@10 没有提升**。照实：只有读取 ≥25 条且注入了 bge 时才看得到收益，缺省 `limit=10` 看不到；热查询 p95 对 R7 1.33×、冷首查 1.07×。gen 检索调优到此停止。详见 [`CHANGELOG_rel-v1.15.md`](CHANGELOG_rel-v1.15.md)。
+>
+> **2026-10-13 增量升级 rel-v1.14**：版本链（`enable_chain`，可选、缺省关）零 LLM 抽取缺省升为 v27 = v26 + A,V,AM,D,Q,H（叙事句非断言门误挡修整、E 族动词扩充、指代领属语、属性重复、转述）。新保留集 H23（叙事体裁，n=632）完全正确率 v26 行为 .3180 → v27 .3734（+.0554，35 胜 0 负，McNemar p 5.8e-11；照实：门槛 +.05，压线通过，H23 已暴露），键错 84→83，误登记 157（与 v26 相同），耗时 ABBA 1.002×。检索主线未改，回归门逐题相同。rel-v1.11–v1.13 的说明见各自 CHANGELOG。详见 [`CHANGELOG_rel-v1.14.md`](CHANGELOG_rel-v1.14.md)。
+
+> **2026-10-13 增量升级 rel-v1.10**：修复 rel-v1.6 起中文联想通路 v11c 的冷查询延迟（v1.6–v1.9 未验收项：新库首个触发稠密补入的查询要现编整库 bge-small-zh 向量，冷 p95 ≈ 1.67× v7.1，超预登记上限 1.5×）。新增纯时延件 `prefetch_dense()`：宿主批量写入后调用一次，预先编好全库稠密向量（与首次触发同批，逐位相同），冷 p95 降到 **1.32×** v7.1；**所有名次逐位不变**（DuRT dev/hold2、T2R2 r1dev/r2dev 预取开关逐题相同，回归门逐题相同）。**预取不是缺省行为**（写入期 ≈39 s/260 段，需宿主调用）。另随附 v2-m3 级联复打开关 `sem_casc`（缺省关）。本版不含检索质量提升。详见 [`CHANGELOG_rel-v1.10.md`](CHANGELOG_rel-v1.10.md)。
+
+> **2026-10-13 增量升级 rel-v1.9**：版本链（`enable_chain`，可选、缺省关）零 LLM 抽取缺省升为 v21；新保留集 H17 完全正确率 .6823 vs v19 行为 .6321（+.0502，照实刚过线）。检索主线未改。详见 [`CHANGELOG_rel-v1.9.md`](CHANGELOG_rel-v1.9.md)。
+
+> **2026-10-13 增量升级 rel-v1.8**：修复 rel-v1.5 起英文可选语义第二路 F3 的带模型查询延迟（v1.5–v1.7 未验收项：热 p95 ≈ 5.7×、冷首查 p95 ≈ 9.8× r7 带模型配置）。三个纯时延件——写入时顺带缓存逐词向量（F3L）、查询向量后台预取（F3P）、MaxSim 小矩阵乘单线程 BLAS（F3T）——后对 r7 为 **0.92× / 0.92×**（预登记硬门 ≤1.5×），**所有名次逐位不变**（无模型/带模型回归门逐题相同）。F4 说话人意图先验代码随附、缺省关，保留集判定进行中。本版不含检索质量提升。详见 [`CHANGELOG_rel-v1.8.md`](CHANGELOG_rel-v1.8.md)。
+
+> **2026-10-13 增量升级 rel-v1.7**：版本链（`enable_chain`，可选、缺省关）零 LLM 抽取缺省升为 v18 规则集（v17 窗口收紧与主体残片后修 + v18 方括号频道名守卫与 L/U/C 规则族；v19 新规则族经双留出集裁定全部缺省关）。新保留集 H15（n=658）完全正确率 .795 vs 上一版 v16 .734（+.061，40 胜 0 负，McNemar p 1.8e-12）；照实：同一规则集在上一轮保留集 H14 上 +.042 未达 +.05，两集合并 +.051。键错 24≤41、零 LLM 过；误登记约束本轮无检出力；建账耗时预登记口径 1.159×（压线未过，重负载）、事后 ABBA 复测 1.107×。检索主线未改。详见 [`CHANGELOG_rel-v1.7.md`](CHANGELOG_rel-v1.7.md)。
+
+> **2026-10-13 增量升级 rel-v1.6**：中文联想通路缺省由 v7.1 升为 v11c——词面头部过阈段少于 5 条时，才按本地 bge-small-zh-v1.5 稠密余弦补入 20 个候选，补入段须过重排阈（logit ≥ 0），补入时取段 ≤ 2·sem_min；稠密模型缺失逐位退回 v7.1，重排模型缺失逐位退回零模型 v4。DuRT 同分布保留集召回/全证据/nDCG@10 显著提升（10:0 / 9:0 / 10:0），CovidRetrieval OOD 保留集无回退（亦无增益），T2R2 误用 +.0045（容差内）。英文通路与版本链未改。详见 [`CHANGELOG_rel-v1.6.md`](CHANGELOG_rel-v1.6.md)（此前 rel-v1.4 版本链 v16、rel-v1.5 英文 F3 见各自 CHANGELOG）。
+
+> **2026-10-13 增量升级 rel-v1.3**：版本链（`enable_chain`，可选、缺省关）零 LLM 抽取升级为 v15：规则/锚定/「主体 属性 值」都认不出的句子，去掉消息体外壳（句首「【…】」标签、「标签：」、时间戳、`fix(S):` 提交头、转述头、`@提及` 等）后重抽，重抽结果须过「主体已知、取值非单字、形态一致」三道门；另有千分位/键值/属性残片/位置近义/两值未决等后修（`LINGSHU_NG_CHAIN_V15=0` 退回 v13.1）。新保留集 H11（换实体/取值/写法，n=659）语料级抽取完全正确率 v15 .725 vs 上一版 v13.1 .571（105 胜 3 负，McNemar p 1.3e-27），可选 B .798；键错 55≤57、新误登记区段 R15（约 290 万字、v13.1 区段内 107 条登记，有检出力）116=116、建账耗时 1.05×、零 LLM 均过。检索主线未改，回归门逐题相同。本目录 `python -m pytest tests_ng -q`：**2985 passed, 1 skipped**。未胜项见 [`CHANGELOG_rel-v1.3.md`](CHANGELOG_rel-v1.3.md)。
+
+> **2026-10-13 增量升级 rel-v1.2**：版本链（`enable_chain`，可选、缺省关）抽取升级为零 LLM v13.1（速记体/渠道前缀/「主体 属性 值」/冷启动待查队列），另附可选受限 LLM 抽取 B（`LINGSHU_NG_CHAIN_LLM=1`，缺省关）。新保留集 H10（换实体/取值/写法，n=604）语料级抽取完全正确率 v13.1 .531 vs 上一版 .270（162 胜 4 负），B .684；键错、误登记、耗时 0.99×、零 LLM 约束均过（新误登记区段事件稀疏、检出力弱，已在 CHANGELOG 注明）。检索主线未改，回归门逐题相同。本目录 `python -m pytest tests_ng -q`：**2980 passed, 1 skipped**。r10–r13 未过判据的历史与未胜项见 [`CHANGELOG_rel-v1.2.md`](CHANGELOG_rel-v1.2.md)。
+>
+> **2026-10-12 增量升级 rel-v1.1**：英文词级通路新增可选「稠密–稀疏加权融合」`densefuse.py`——只在配置了本地英文句向量模型（如 bge-small-en-v1.5，`LINGSHU_NG_EMBED_MODEL`，需 onnxruntime+tokenizers，权重不随仓库发布）时生效；**没有模型时与 rel-v1 逐位相同**。新的未暴露轮级保留集 LoCoMo-Plus Cognitive（291 题×两口径）上对 TriCue v3、多维 v3×3、无模型 v3.2 全面显著领先（t@10 .244 vs TriCue .021），但相对 rel-v1「同一模型 + LDD 交错」优势小（仅 1/8 项显著，t@10 +.038）。本目录 `python -m pytest tests_ng -q`：**2952 passed, 1 skipped**。详见 [`CHANGELOG_rel-v1.1.md`](CHANGELOG_rel-v1.1.md)。
+>
+> **2026-10-12 集成升级 rel-v1**：在下述快照与 neural 增补之上合入英文词级通路 gen-v3.2、中文联想通路 v7.1（可选本地重排模型，缺模型逐位退回零模型 v4）与版本链（可选，默认关）。本目录内 `python -m pytest tests_ng -q`：**2946 passed, 1 skipped**。HMB 检索轨 cid .6804（不变）、原句 .2770→.3701、要点 .5765→.6395；英文 LME test s@5 .5995→.9716、LoCoMo test r@10 .438→.694。未胜项（LME 轮级 t@10 对 TriCue v3 平手、中文误用与 must_exclude 仍输）与集成核对见 [`CHANGELOG_rel-v1.md`](CHANGELOG_rel-v1.md)；分线报告 `REPORT_GEN_v1.md`、`bench_gen/REPORT_GEN_v3.md`、`REPORT_ZH_v1.md`、`REPORT_CHAIN_v1.md`，测评脚本在 `bench_gen/`、`bench_zh/`、`bench_chain/`、`bench_rel/`（不含数据集原文与模型权重）。
+
+> 本目录由 Liyang（GitHub: Liyang1145）提交，是对上游 [FuRongJun-1999/lingshu](https://github.com/FuRongJun-1999/lingshu) 身体侧记忆引擎的**完全重写**，以及配套的测评脚本与读数。
+> 快照来源：重写仓库分支 `ng` 的已提交 HEAD `875d838bdbba2d686d429e1998edf67cdbb96b62`（2026-10-09 13:00 CST；= iter4 收口 `11a449a` + 规模优化线 `arch-scale` rebase 后快进合入），用 `git archive` 导出，不含任何未提交改动。该提交上 `python -m pytest tests_ng -q`：**2798 passed**（含上游 `tests/` 的开发树）。
+> 同步范围：`lingshu_ng/`、`lingshu/`、`tests_ng/`、`evalsuite*/`、`REWRITE_REPORT_core.md`、`ARCH_SCALE_LOG.md`、`tools/scale/`。不含模型文件、SQLite 库、缓存与 `__pycache__`。
+> 发布副本专有、与 ng 源仓库不同的文件：`README.md`、`REWRITE_PLAN.md`（措辞按 §6.1 改写）、`pyproject.toml`（新增 `semantic` 可选依赖、改了一行注释，见 §6.2）。`tests_ng/nn/test_quality_nn.py` 的审查修订（§6.2）已在 ng 源仓库提交 `a3fb0ae`，本快照包含它。
+
+> **2026-10-10 增补：读路径第三阶段（neural，可选，默认关）**。在本快照上叠加 3 个提交（新增 `lingshu_ng/neural.py`、`lingshu_ng/embed/cross.py`、`tests_ng/test_neural.py`，改 `engine.py`/`retrieval.py`/`semindex.py`/`compat_engine.py`/`embed/__init__.py`）。不设环境变量时行为与 875d838 相同、仍为纯标准库。HMB 检索轨生产路径读数（184 问，自行跑分）：精档 bge-m3 + bge-reranker-base cid 0.7826 / 全召回 0.522，对照 BM25 0.6683 / 0.326，代价是干扰项 must_exclude 0.28→0.39、每问约 5.3 s（2 核 CPU）。详见 [`REPORT_neural.md`](REPORT_neural.md)，原始输出与实验台在 `evalsuite_hmb/neural/`。本目录内 `python -m pytest tests_ng -q`：**2815 passed, 1 skipped**。
+
+## 1. 这是什么
+
+`lingshu_ng` 是从零写的新实现（独立包，不 import 旧 `lingshu.core`），并带 `lingshu_ng.compat` 兼容门面，让旧 API 的调用方无需改代码即可切换。重写坚持原作者的设计意图：
+
+- **零 LLM 写入**：原文照旧零 LLM 落库，写入路径不调用任何模型；
+- **原文路线**：存原句、召回原句，向量等只作派生索引（可丢弃重建，不进主库）；
+- **核心纯标准库**：记忆核心只用标准库（`tests_ng/test_quality.py` 有零依赖门禁；§3 的干净 venv 实测在不装 numpy 的环境里构造引擎、写入、召回）；重量级依赖只在 world / nn / gen 与可选语义路；
+- **可溯源、条件显式、确定性优先**：回执的层一律从库读回、判环只由 Tarjan/Kahn 回答、衰减为确定性批量周期等（逐项对照见 `REWRITE_REPORT_core.md`）。
+
+设计与架构见 `REWRITE_PLAN.md`；按上游 issue 归类的修复对照见 `REWRITE_REPORT_core.md`、`evalsuite/ISSUE_COVERAGE.md`。
+
+**效果怎么看**：本 README 不对「新版比旧版强多少」下总括结论。证据分两层（§4）：作者本人的外部基准 hive-memory-bench 检索轨（92 题 novel 语料，k=10，§4.1 表）上，ng@d523cfd 必需章 cid 召回 .6541（integrated-v3 .5989，BM25 .6683）、必需章全召回率 .3370（.2717，BM25 .3261）、证据句逐字召回 .2522（.1886，BM25 .2675）；我们自建的两套测评上的分差另见 §4.2/§4.3，但题目和判分都是我们自己定的，有自评偏差，只能当作「按上游 issue 与旧项目声明逐项核对」的记录，不能当作独立评价。
+
+## 2. 目录结构
+
+| 路径 | 内容 |
+|---|---|
+| `lingshu_ng/` | 重写版引擎：`store/`（schema、仓储、参数化 SQL）、`layers.py`、`dedup.py`、`novelty.py`、`gate.py`、`decay.py`、`causal.py`、`activation.py`、`self_model.py`、`negative.py`、`semindex.py`（可选语义第二路）、`engine.py`、`compat*.py`（旧 API 门面），以及 `world/`、`nn/`、`gen/`、`perception/` 的重写与 `embed/`（可选 ONNX 编码器） |
+| `lingshu/` | 旧版身体侧包（ng 分支上的副本＝上游代码 + 集成修复线），**仅用于差分测试与兼容对照**，不是本次重写的主体 |
+| `tests_ng/` | ng 的测试（含与旧实现逐项对照的差分测试、性质测试、world/nn 子目录）；`tests_ng/intent/` 为意图守卫（旧项目测试原样跑在 ng 上）的驱动与读数 |
+| `evalsuite/` | 自建测评 r 系列（缺陷探针 / 性质 / 性能 / 代码质量），榜单 `LEADERBOARD_NG.md`，意图守卫报告 `INTENT_FIDELITY.md`，读数在 `out/` |
+| `evalsuite_hard/` | 自建 HARD 榜（参考值取理想上限、规模到 200k），意图锚定表 `INTENT_MAP.md`，榜单 `LEADERBOARD_HARD.md` / `LEADERBOARD_HARD_V2.md`，读数 `out/hard_r*.json`；`hmbq/` 为 HMB 检索轨本地迭代记录 `ITER_HMBQ.md` 与原型脚本 |
+| `evalsuite_hmb/` | 用作者基准 hive-memory-bench（HMB）跑的检索轨与生成轨，报告 `REPORT_HMB*.md`，读数 `out/hmb_r1.json`、`out/hmb_r2.json` 等 |
+| `ARCH_SCALE_LOG.md`、`tools/scale/` | 50k 规模优化线（arch-scale：写入、激活、冷自检）的方案、读数与复现脚本，见 §4.4 |
+| `fixes-v3/` | 另一条线：直接在旧代码上逐条修 issue 的分支 integrated-v3（HEAD `667e84a`），以相对上游 `96c6f42` 的累计 diff、提交列表和 4 个未合入修复补丁的形式提供，说明见 `fixes-v3/README.md` |
+| `upstream-watch/` | 上游 issue/PR 防撞台账（`tracker.json` + 说明），已入账到 #329、上游 main `83cce59`，用于避免与上游重复提交 |
+| `REWRITE_PLAN.md` / `REWRITE_REPORT_core.md` | 重写计划 / 核心重写报告 |
+| `pyproject.toml`、`LICENSE` | 包配置（测试会读取它）与上游同款 MIT 许可证 |
+
+本目录**不含**上游仓库的旧测试目录 `tests/`（意图守卫与一条 compat 表面测试需要它，见 §6.2）。
+
+## 3. 快速开始
+
+**要求**：Python ≥ 3.11（实测 3.12.15；另测 3.11.17 / 3.13.5）。
+
+```bash
+cd Liyang
+python3 -m venv .venv && . .venv/bin/activate
+pip install -e . pytest                       # 核心：零第三方依赖
+pip install ./plugins/lingshu-ng-embed        # 可选：本地 ONNX 语义件（numpy、onnxruntime、tokenizers；模型权重自备）
+pip install ./plugins/lingshu-ng-world ./plugins/lingshu-ng-nn ./plugins/lingshu-ng-gen   # 可选：world / nn / gen（numpy、Pillow）
+```
+
+API 用法见 [`docs/API_ng.md`](docs/API_ng.md)（安装、两个入口、兼容门面与不支持方法语义、capabilities、插件、异常、环境变量、存储并发与数据安全）。
+
+```bash
+# 发行包（rel-v1.24 起拆包；包名 lingshu-ng 只含 lingshu_ng，零依赖）
+pip install lingshu-ng                 # 核心
+pip install lingshu-ng-embed           # 插件（按需）
+python -m pytest tests_ng -q           # 核心测试；插件测试在 plugins/<插件>/tests_<名>/
+```
+
+**发行包**（rel-v1.24 起；rel-v1.18–v1.23 为 `pyproject.toml` 的 extras，已删除）：
+
+| 安装 | 装什么 | 用途 |
+|---|---|---|
+| `pip install lingshu-ng` | 无第三方依赖 | 记忆核心 `lingshu_ng`（纯标准库） |
+| `pip install lingshu-ng-embed` | `numpy`、`onnxruntime`、`tokenizers` | 可选语义件（`lingshu_ng.semrank` 交叉编码 / 稠密 / 判别头的模型部分、`lingshu_ng.embed.OnnxEmbedder`、`lingshu_ng.embed.cross.OnnxCrossEncoder`）；模型权重不随包发布，需自备并设 `LINGSHU_NG_SEM` |
+| `pip install lingshu-ng-world` / `lingshu-ng-nn` / `lingshu-ng-gen` | `numpy>=2.3.5,<2.6`、`Pillow>=12.2,<13`（gen 另需 lingshu-ng-nn） | `lingshu_ng.world` / `nn` / `gen`（导入路径不变） |
+
+旧命令对照：`".[embed]"` → `lingshu-ng-embed`；`".[world]"` / `[nn]` / `[gen]` → 对应插件包；`".[full]"` → 四个插件包；`".[dev]"` → 自行 `pip install pytest`。
+没装插件时：中文长请求逐位退回 v4 词面档（与无模型时相同），进程内打一次 WARNING 提示 `pip install lingshu-ng-embed`；`import lingshu_ng.world` 抛带安装提示的 `ModuleNotFoundError`。
+
+rel-v1.17 及以前的 `accel` / `semantic` / `data` / `diffusion` 分组属于旧 `lingshu/` 包，已随旧包一起移出发行包（`semantic` 由 `embed` 取代，rel-v1.24 起再由插件包 `lingshu-ng-embed` 取代）。
+
+**本快照（ng@875d838）实测**：在本发布目录内（不含上游 `tests/`）跑 `python -m pytest tests_ng -q`，**2797 passed, 1 skipped**，约 41 s。这次用的是已装 numpy/Pillow/SciPy/pytest 的开发环境，不是干净 venv。
+
+**干净 venv 实测（2026-10-09，上一版快照 ng@08efc93 + `a3fb0ae` 修订；`/tmp` 下新建 venv，按当时 README 的命令逐字执行；rel-v1.24 起安装命令已改为核心 + 插件包，见上）**
+
+- 环境：Python 3.12.15；`pip install -e ".[full,dev]"` 装上 numpy 2.5.3、Pillow 12.3.0、pytest 9.1.1（无 SciPy）。
+- `python -m pytest tests_ng -q`：**1978 passed, 1 skipped**，约 43 s（分段：核心 488 passed；`tests_ng/world` 1003 passed；`tests_ng/nn` 487 passed、1 skipped）。唯一的 skip 是 `test_compat_surface_covers_legacy_tests`，原因见 §6.2。
+- 另起 venv 做非 editable 安装 `pip install ".[full]"`：在仓库外 `import` 全部 112 个 `lingshu_ng.*` 模块，0 个失败。
+- 再起 venv 只装 `pip install .`（无 extras）：`from lingshu_ng.engine import MemoryEngine` 构造、`perceive`、`recall` 正常，进程中未加载 numpy。
+- 额外装 `.[semantic]`（onnxruntime 1.31.0、tokenizers 0.23.2，未设模型变量）后，测试结果不变。
+
+### 3.1 复跑说明（rel-v1.16 起；稳定性 / 兼容性）
+
+本节回答「在你的机器上跑 `tests_ng` 应该看到什么」。所有读数都是我们在 Linux（Python 3.12.15，2 核）上的实测；
+Windows 上的已知差异（粗时钟、onnxruntime DLL 加载失败）已用模拟环境覆盖（见下文「验收矩阵」），但不是真机读数。
+
+#### 前置条件
+
+| 项 | 最小环境 | 完整环境 |
+|---|---|---|
+| Python | ≥ 3.11 | ≥ 3.11 |
+| 安装 | `pip install -e . pytest`（只有 pytest；rel-v1.23 及以前写作 `.[dev]`） | `pip install -e . pytest ./plugins/lingshu-ng-embed ./plugins/lingshu-ng-world ./plugins/lingshu-ng-nn ./plugins/lingshu-ng-gen`（numpy、Pillow、onnxruntime、tokenizers；rel-v1.23 及以前写作 `.[full,dev]`） |
+| 模型 | 不需要；建议设 `LINGSHU_NG_SEM=off` 明确关闭 | 自备 ONNX 模型目录（权重不随仓库发布），设 `LINGSHU_NG_SEM=<模型目录>` |
+
+`LINGSHU_NG_SEM` 指向的模型目录结构（缺哪个件，哪个件退回，其余不受影响）：
+
+```
+<LINGSHU_NG_SEM>/
+  bge-reranker-base/   tokenizer.json, onnx/model_quantized.onnx   交叉编码重排（中文长请求 v7.1 档）
+  bge-small-zh-v1.5/   tokenizer.json, onnx/…                      稠密补入（v11c 档）
+  bge-small-en-v1.5/   model_quantized.onnx, tokenizer.json        英文逐词向量件的测试（test_tokvec_pre；也可用 LINGSHU_NG_TOKVEC_MODEL 指定）
+```
+
+未设 `LINGSHU_NG_SEM` 时（rel-v1.19 起）缺省目录是 `~/.cache/lingshu_ng/models`（rel-v1.20 起若设了绝对路径的 `XDG_CACHE_HOME`，则为 `$XDG_CACHE_HOME/lingshu_ng/models`），并打一次 WARNING 写明该目录及是否存在；目录不存在时效果等同无模型。rel-v1.18 及以前缺省是作者本机路径。
+设为 `off` 即关闭全部模型件。
+
+#### 缺依赖或模型时哪些测试会跳过
+
+跳过一律带原因（`-rs` 可见），且只在缺件时发生；装齐后 0 skip。
+
+| 缺什么 | 跳过什么 |
+|---|---|
+| numpy / Pillow | （rel-v1.24 起 world / nn 测试在 `plugins/lingshu-ng-world/tests_world/`、`plugins/lingshu-ng-nn/tests_nn/`，随插件测试跑；以下为 rel-v1.23 及以前的说法）`tests_ng/world/`、`tests_ng/nn/` 中导入它们的模块（原因：`可选依赖 numpy 未安装（world/nn 需要 pip install -e ".[full]"）`），以及核心目录里用 `require("numpy")` 按需跳过的用例（最小环境实测 17 处，含`test_semrank.py` 稠密补入 / 融合 6 条、`test_backlog_core_r3.py::test_216_prediction_miss_searchable_by_content`、`test_stab_env.py::test_world_rebuild_latest_frame_with_tied_clock`、`world/test_scene_relations.py::test_compat_scene_model_uses_fixed_solver`）与 `test_compat_surface.py` 的 2 条世界线用例（「ng 世界线依赖 numpy/PIL」） |
+| onnxruntime / tokenizers（没装，或装了但原生库加载失败，如 Windows DLL 被拒） | `test_tokvec_pre.py` 整文件（rel-v1.24 起在 `plugins/lingshu-ng-embed/tests_embed/`）（原因含异常原文）；连带下两行 |
+| bge-small-en-v1.5 | `test_tokvec_pre.py` 整文件（「bge-small-en-v1.5 不在本机」） |
+| 交叉编码模型 bge-reranker-base | `test_semrank.py::test_real_scorer_smoke`（「可选语义模型未安装」） |
+| 稠密模型 bge-small-zh-v1.5 | `test_semrank.py::test_real_embedder_smoke`（「bge-small-zh 不可用」） |
+
+其余用例在任何组合下都必须通过；缺件的退回路径本身有专门用例（`no_models` 夹具把模型件固定为不可用，与机器上装了什么无关）。
+
+#### rel-v1.24 拆包后的命令与读数
+
+```bash
+# 纯核心：干净 venv 只装 pytest，不装任何插件（源码目录里加 LINGSHU_NG_SOURCE_PLUGINS=0，确保不发现 plugins/ 下的插件）
+LINGSHU_NG_SOURCE_PLUGINS=0 LINGSHU_NG_SEM=off python -m pytest tests_ng -q -rs
+# 本版实测：1753 passed, 27 skipped（干净 venv 只装 pytest，LINGSHU_NG_SOURCE_PLUGINS=0，随机序 605）
+
+# 核心 + 全部插件（插件测试目录一起跑；拆包前同一批用例都在 tests_ng 下）
+python -m pytest tests_ng plugins/*/tests_* -q -rs
+# 本版实测：3298 passed（3.12.15 + onnxruntime + 模型件，核心 tests_ng + 4 个插件测试目录；随机序 61 / 62 各 3298 passed）
+```
+
+以下「两套命令」是 rel-v1.16 时的写法与读数，保留作对照（`.[dev]` / `.[full,dev]` 已改为上面的安装方式）。
+
+#### 两套命令与预期读数
+
+```bash
+# 最小环境：干净 venv，只装 pytest（无 numpy / Pillow / onnxruntime / 模型）
+python3 -m venv .venv-min && . .venv-min/bin/activate
+pip install -e ".[dev]"
+LINGSHU_NG_SEM=off python -m pytest tests_ng -q -rs
+# 预期：1939 passed, 51 skipped（0 failed；skip 原因见上表）
+
+# 完整环境：装齐可选依赖并提供模型目录
+python3 -m venv .venv-full && . .venv-full/bin/activate
+pip install -e ".[full,dev]"
+LINGSHU_NG_SEM=/path/to/models python -m pytest tests_ng -q -rs
+# 预期：3113 passed（0 failed、0 skipped；需 4 个模型件齐全，缺哪个按上表多出对应 skip）
+```
+
+`-q` 模式下测试结尾会打印「lingshu_ng 本机生效档位」一节：各可选依赖是否可用（含导入失败的异常原文）、各模型件是否可用及原因、
+中文长请求语义通路实际跑的是哪一档。**对读数前先看这一节**——同样是全绿，`v4` 档与 `v11c` 档跑的不是同一条路径。
+
+#### 验收矩阵（本版发布前实测）
+
+Linux、Python 3.12.15，全部用随机测试序（每次不同种子）：
+
+| 环境 | 种子 | 读数 |
+|---|---|---|
+| 完整（onnxruntime + 本地模型）随机序 ×5 | 11/22/33/44/55 | 3113 passed ×5，0 failed，0 skipped |
+| 无 onnxruntime（_envsim/no_ort）×3 | 101/102/103 | 3107 passed, 3 skipped ×3，0 failed |
+| onnxruntime 原生库加载失败（_envsim/ort_broken，Windows DLL 拒绝同形）×3 | 201/202/203 | 3107 passed, 3 skipped ×3，0 failed |
+| 无模型（LINGSHU_NG_SEM=off）×1 | 301 | 3107 passed, 3 skipped，0 failed |
+| 粗时钟 1/64 s（_envsim/coarse_clock，Windows 式）×2 | 401/402 | 3113 passed ×2，0 failed |
+| 最小环境（干净 venv 只装 pytest；无 numpy/Pillow/onnxruntime/tokenizers；LINGSHU_NG_SEM=off）随机序 ×1 | 501 | 1939 passed, 51 skipped，0 failed |
+
+模拟环境的用法见 `tests_ng/_envsim/README.md`；随机序插件是仓内的 `tests_ng/shuffle_plugin.py`（`-p tests_ng.shuffle_plugin`，
+种子由 `LINGSHU_TEST_SHUFFLE_SEED` 给定、打印在结尾），不需要安装 pytest-randomly。
+
+#### 多 Python 版本（rel-v1.17 起）
+
+`tools/ci/multi_python.sh [3.11 3.13 …]`：每个版本建独立 venv（系统有 `pythonX.Y` 就用，否则 `uv python install`），依赖只装进 venv，
+缺省 `LINGSHU_NG_SEM=off`、装 pytest + numpy + Pillow（`MP_EXTRAS` 可加 onnxruntime / tokenizers，`MP_MINIMAL=1` 只装 pytest）。
+实测（Linux aarch64）：Python 3.11.17 与 3.13.5 各 **3116 passed, 3 skipped**（skip＝无 onnxruntime / 模型的预期跳过），0 failed。
+
+#### `capabilities()`：本机实际生效的是哪一档
+
+```python
+from lingshu_ng.capabilities import capabilities
+c = capabilities()          # 纯数据，可 json.dumps
+c["dependencies"]["onnxruntime"]   # {"available": bool, "version": str|None, "error": "ImportError: DLL load failed …"|None}
+c["models"]["cross_scorer"]        # {"available": bool, "reason": "已关闭（LINGSHU_NG_SEM=off）" / "缺模型文件 …" / None}
+c["semantic_tier"]                 # "v4"（无交叉编码件）/ "v7.1" / "v11c"（+ 稠密补入）/ "v13"（+ 复打）/ "off"
+c["fallbacks"]                     # 本进程迄今发生过的退回（每类只记一次，同时打一次 WARNING 日志）
+```
+
+引擎上也有同名方法：`MemoryEngine(...).capabilities()`、兼容门面 `SpacetimeMemoryEngine(...).capabilities()`（旧引擎没有此方法，属 ng 扩展）。
+调用只读，不改变任何行为；模型件按需构造的是召回时用的同一个单例。
+
+**本发布目录内的读数**：上面的读数在开发树（含上游 `tests/`）上测得；在本发布目录内跑，`tests_ng/nn/test_quality_nn.py` 的上游旧测试表面核对因缺上游 `tests/` 而 skip（原因见 §6.2），所以完整环境读数为 **3112 passed, 1 skipped**（2026-10-13 实测，Linux / Python 3.12.15，onnxruntime + 4 个模型件齐全）。
+
+**测评复跑**（脚本里的示例路径是我们本机的绝对路径，复跑时换成你的检出位置；各维度的单项复现命令见 §4.2、§4.3）
+
+```bash
+# 1) 自建 r 系列（三方：上游 base / 集成修复版 integrated / ng）
+python3 evalsuite/run_all.py \
+  --snap base=<上游检出>@2bb8291 \
+  --snap integrated=<集成修复版检出> \
+  --snap ng=<本目录>            # 名字为 ng 时走 lingshu_ng.compat 门面
+# 输出 evalsuite/out/leaderboard.json 与 LEADERBOARD_NG.md
+
+# 2) 自建 HARD 榜（分段续跑，每段 ≤100s）
+python3 evalsuite_hard/run_hard.py --run r1 \
+  --snap base=<上游检出>@2bb8291#legacy \
+  --snap integrated=<集成修复版检出>@667e84a#legacy \
+  --snap ng=<本仓库>@<rev>#ng --budget 100
+evalsuite_hard/drive.sh r1                         # 循环分段直至完成
+python3 evalsuite_hard/run_hard.py --run r1 --render   # → out/hard_r1.json + LEADERBOARD_HARD.md
+
+# 3) 作者基准 HMB（需先检出 https://github.com/FuRongJun-1999/hive-memory-bench）
+export HMB_ROOT=<hive-memory-bench 检出>
+python3 evalsuite_hmb/run_retrieval.py queries
+python3 evalsuite_hmb/run_retrieval.py run ng novel   # snap ∈ base/integrated/ng/bm25
+python3 evalsuite_hmb/metrics_r1.py                   # 检索轨读数（零 LLM）
+# 生成轨（gen_main.py / judge_main.py / e2e_track.py）需要 LLM 网关，密钥从环境变量 CLINE_API_KEY 读取
+```
+
+各测评目录下的 `README.md` 与报告有完整参数说明。
+
+## 4. 测评证据（分两层）
+
+所有数字都取自本目录内的读数文件，出处逐项列出。**参测的 ng 版本都早于本快照 `875d838`**（都是它的祖先提交或其工作树，见各表），本快照作为整体没有被这些测评直接测过。
+
+### 4.1 第一层：外部基准（作者的 hive-memory-bench）
+
+题目、语料、指标与 BM25 参照都来自原作者公开的 hive-memory-bench（HMB 仓库 commit `72130ac`），不是我们出的。但这一轮是**我们自己跑的**，口径与作者有差异：统一切块；矛盾对/地基句用公开 cards 机械构造的代理清单（作者的 9 对未公开）；生成轨的两个判官是同一模型（deepseek-v4.1-flash）的两个实例、单次采样。详见 `evalsuite_hmb/REPORT_HMB.md` §0。
+
+**(a) 检索轨（零 LLM，92 题 novel 语料，k=10）：三项读数见下表（cid 召回与逐字召回低于 BM25，全召回率高于 BM25）**
+
+| 指标 | base@2bb8291 | integrated（v3）@667e84a | ng@d523cfd | ng 相对 v3 | BM25 |
+|:--|--:|--:|--:|--:|--:|
+| 必需章 cid 召回 | 0.5989 | 0.5989 | 0.6541 | +9.2% | 0.6683 |
+| 必需章全召回率 | 0.2717 | 0.2717 | 0.3370 | +24.0% | 0.3261 |
+| 证据句逐字召回 | 0.1886 | 0.1886 | 0.2522 | +33.7% | 0.2675 |
+| 采分点关键词覆盖 | 0.5013 | 0.5013 | 0.5496 | +9.6% | 0.5612 |
+| 小说检索中位 ms | 16.9 | 17.2 | 6.03 | 约 2.9× 快 | 0.21 |
+
+出处：`evalsuite_hmb/out/hmb_r1.json`（`results.<臂>.*`）、`evalsuite_hmb/REPORT_HMB.md` §1。相对值按 `ng/integrated − 1` 由上表数值算出。BM25 在查询延迟上比 ng 快一个数量级以上。
+
+后续迭代 c2（池内 idf 重排 + 相邻写入惩罚）与可选语义第二路的**引擎实测**（`evalsuite_hard/hmbq/run_hmbq.py`，走生产路径 add_perception/recall，与 BM25 同轮同机；ng@fa1d346 工作树；出处 `evalsuite_hard/hmbq/ITER_HMBQ.md`「引擎实测」节、`evalsuite_hard/hmbq/out/metrics_h4_lex.json`、`metrics_h5_bges.json`、`metrics_h5_bgeb.json`）：
+
+| 臂 | cid 召回 | 原句召回 | must_exclude 混入↓ | 难 9 对另一侧（代理） | 查询中位 ms |
+|---|---|---|---|---|---|
+| BM25（同轮对照） | 0.6683 | 0.2675 | 0.2838 | 2/9 | 0.19 |
+| **ng 默认：纯词面 c2** | 0.6804 | 0.2770 | 0.3108 | 0/9 | 5.14 |
+| ng + bge-small-zh（交错融合 LDD） | **0.7347** | **0.3224** | **0.2432** | 1/9 | 13.1 |
+| ng + bge-base-zh（交错融合 LDD） | 0.6932 | 0.2975 | **0.2432** | **3/9** | 45.6 |
+
+怎么读：
+
+- **默认配置**（纯词面，零依赖）只是**略超** BM25（cid 0.680 对 0.668），差距在 92 题的噪声量级内；须排除句混入比 BM25 差；难矛盾对 0/9。
+- **语义第二路默认关闭**。开启方式：装 `.[embed]`（rel-v1.17 及以前为 `.[semantic]`），自行从 HuggingFace 下载 `Xenova/bge-small-zh-v1.5` 或 `Xenova/bge-base-zh-v1.5`（`onnx/model_quantized.onnx`，约 24 MB / 103 MB；本目录**不附带模型**），设环境变量 `LINGSHU_NG_EMBED_MODEL=<模型目录>`。
+- 开启后 cid、原句、须排除三项都超过 BM25；bge-base 在难 9 对上到 3/9（BM25 2/9），但这一项刚到线：按批编码的另一次运行是 4/9，向量的微小扰动就会让一块进出前 10。
+- 代价是延迟和依赖：查询中位从 5.1 ms 升到 13 ms（small）/ 45.6 ms（base），BM25 是 0.19 ms；写入后要在后台线程补齐向量编码（bge-base 约 0.6 s/长块 CPU）。查询 <10 ms 的目标在 CPU 模型路线上**没有达到**。
+- 难 9 对用的是我们从公开 cards 构造的代理清单（作者的 9 对未公开），BM25 的 2/9 已归因于标点二元组的分词巧合（见 `ITER_HMBQ.md`）。
+
+**(b) 生成轨 r2（主轮 92 题，同一生成器，唯一变量＝检索材料，《秤》合并均口径）：ng 仍低于 BM25**
+
+| 臂 | base | integrated | ng@d523cfd | BM25 | 闭卷 |
+|---|---|---|---|---|---|
+| 主轮合并均 | 0.2278 | 0.2276 | 0.2671 | **0.2830** | 0.0893 |
+
+出处：`evalsuite_hmb/REPORT_HMB_r2_5arm.md` §2。该报告硬闸栏结论记为 `?`，报告自注「通过数不作为数值读数」；合并均为单次采样、同模型双判官的读数，只宜看排序。**生成轨仍是这份旧读数**（ng@d523cfd，早于 c2 与语义第二路），没有用新检索配置重跑。
+
+### 4.2 第二层：自建测评 · r 系列（`evalsuite/`）
+
+> ⚠ **自评偏差声明**：r 系列的探针、性质、计分规则和权重全部由我们（重写方）设计和判分。探针是照着上游 issue 写的，而 ng 正是对着这些 issue 重写的，高分在很大程度上是「对着考纲答题」的结果；性能分与质量分是「相对参评者中的最优者」的相对分。这些读数说明 ng 修掉了哪些已知问题，**不能**当作 ng 整体优于旧项目的独立证据。
+
+**r6 读数**（快照 base=upstream@2bb8291、integrated@667e84a、ng@c2ffcbb；规则 evalsuite-rules-v1；出处 `evalsuite/out/leaderboard_r6.json` 的 `scores.*`、`evalsuite/LEADERBOARD_NG.md`）
+
+| 维度（权重） | base | integrated | ng |
+|---|--:|--:|--:|
+| 缺陷探针（0.40） | 10.69（14/131 OK） | 64.89（85/131） | 98.47（129/131） |
+| 性质（0.30） | 59.87 | 89.27 | 100.00 |
+| 性能（0.15，相对分） | 43.90 | 30.45 | 91.57 |
+| 代码质量（0.15，相对分） | 47.88 | 43.58 | 100.00 |
+| 总分 | 36.00 | 63.84 | 98.12 |
+
+**每个维度对应什么、怎么复现**
+
+| 维度 | 对应原作者意图 / 上游 issue | 偏差说明 | 独立复现 |
+|---|---|---|---|
+| 缺陷探针 | 131 个探针逐个对应 86 个上游 core issue（如 #35 检索硬截断、#36 保护失效、#81 多线程、#145/#252 判环、#183 LIKE 通配、#225 去重极性），映射表 `evalsuite/ISSUE_COVERAGE.md`；未写探针的 6 个 issue 及原因也列在该文件 | 判据是我们对 issue 的理解；ng 写作时已知这些 issue | 单个探针：`PYTHONPATH=<快照根>:evalsuite python3 evalsuite/probe_runner.py --impl ng --probe i35-search-truncation`（`--impl legacy` 测旧实现）；全量：`run_all.py --skip props,perf,quality` |
+| 性质（15 条不变量，`evalsuite/props.py`） | 按主题对应（`props.py` 内未标 issue 号，下列为我们的对照）：P01 层不变 ↔ #127/#168/#234/#244；P02/P03 去重幂等与极性 ↔ #29/#223/#225；P04/P05 衰减 ↔ #207/#210；P06 导出导入往返 ↔ #16/#125；P07 判环对暴力枚举 ↔ #145/#252；P08 并发不丢 ↔ #81；P09/P12 非有限值与值域 ↔ #164/#185；P10 检索不含 SELF ↔ #201；P11 SUB 不可写受保护层 ↔ #127/#217/#234/#244；P13 标签精确匹配 ↔ #181/#183；P14 回执＝落库层 ↔ #224；P15 保护存活 ↔ #36/#167/#257 | 随机生成器与性质判据由我们编写 | `PYTHONPATH=<快照根>:evalsuite python3 evalsuite/probe_runner.py --impl ng --prop P07-cycle-vs-brute --seeds 200` |
+| 性能 | 没有一一对应的上游 issue；只有部分操作对应旧代码的复杂度声明（如 `has_causal_cycle` O(V+E)，#145）。操作集（add/recall/decay_cycle/self_check/activation/堆峰值 × 1k/10k/50k）由我们选定 | 相对分；共享 2 核沙箱，读数受负载影响（`LEADERBOARD_NG.md` 头注） | `run_all.py --skip probes,props,quality --sizes 1000,10000,50000` |
+| 代码质量 | **不对应原作者的任何声明意图**，是我们的口径（7 项 AST 指标：模块/函数行数、圈复杂度、重复块率等） | 对比的是 `lingshu/core/`（旧单体）与 `lingshu_ng/`（新写的模块化代码），结构上有利于重写方 | `run_all.py --skip probes,props,perf` |
+
+**意图守卫（旧项目自己的测试原样跑在 ng 上，`evalsuite/INTENT_FIDELITY.md` §1，ng@c2ffcbb）**：upstream 树 `tests/` 201/206（97.57%），integrated 树 908/979（92.75%）。upstream 那组测试来自上游仓库，不是为本次重写编写的，是自建层里偏差最小的一项；integrated 树的测试有一部分是我们修复线自己加的。复现：`python tests_ng/intent/run_intent.py <旧树> ng --out <输出>`（需要上游检出）。
+
+### 4.3 第二层：自建测评 · HARD 榜（`evalsuite_hard/`）
+
+> ⚠ **自评偏差声明**：HARD 榜同样由我们设计。我们要求每个子项都锚定到旧项目代码或作者 HMB 文档里的声明（逐项见 `evalsuite_hard/INTENT_MAP.md`，出处精确到 integrated@667e84a 的文件与行号），但合成语料、「理想上限」参考值、计分公式和维间权重都由我们决定。一个具体的偏差信号：HARD 检索维在我们的合成语料上 ng 91.9 对 integrated 30.1，而在作者的 HMB 语料上 ng 只比 integrated 高 9–34%、仍不及 BM25（§4.1）。
+
+**读数**（出处 `evalsuite_hard/out/hard_r2.json`、`hard_r3.json`、`hard_v2_r3.json` 的 `results.<快照>.s0/s1`；`LEADERBOARD_HARD.md`、`LEADERBOARD_HARD_V2.md`）
+
+| 轮次 | ng 快照 | base s0 / s1 | integrated s0 / s1 | ng s0 / s1 |
+|---|---|---|---|---|
+| r2（v1 规则） | fbeea8c | 46.68 / 46.77 | 52.45 / 52.52 | 82.59 / 84.70 |
+| r3（v1 规则） | 86c4e14 | 47.00 / 47.87 | 54.86 / 55.35 | 88.64 / 89.09 |
+| r3（v2 规则） | 86c4e14 | 49.31 / 50.43 | 54.45 / 55.10 | 88.18 / 88.99 |
+
+r3 s0 总分（自建 HARD 榜，题目与判分由我们设计）：v1 规则 ng 88.64 / integrated 54.86 / base 47.00；v2 规则 ng 88.18 / integrated 54.45 / base 49.31。该总分是自建权重下的加总，不代表各维度或外部基准上的结论。
+
+- r3 的计时子项（规模、因果耗时、HMB 时延）受并发负载污染，只能看同轮相对值（`LEADERBOARD_HARD.md` r3 条）。
+- 空闲机重测 r4 **未完成**：质量段启动后未跑完，计时段未跑，没有出分；续跑命令见 `LEADERBOARD_HARD.md`「r4」节。
+- **结构上限**：即使 ng 每项满分，按 r3 的 integrated 读数也只有 100/54.86 ≈ 1.82 倍（v1）、100/54.45 ≈ 1.84 倍（v2），两榜都到不了 2 倍。
+
+**r3（v1）各维 s0 分、对应意图与复现**
+
+| 维度（权重） | base | integrated | ng | 对应原作者意图（`INTENT_MAP.md` 出处摘要） | 偏差说明 |
+|---|--:|--:|--:|---|---|
+| 规模 scale（15） | 55.21 | 54.98 | 75.66 | 五层记忆核心与写入/连边/召回/衰减/自检路径（`core.py:1-11`、`2786-2797`、`3169-3173`、`1374-1380`）；#35 老记忆不得不可达 | 「理想」与「零点」耗时由我们设定（`score.py:SCALE_REF`）；r3 受负载污染 |
+| 检索 retrieval（20） | 30.03 | 30.13 | 91.92 | `recall`「组合联想」、`search_content` 相关度排序（#82）；退役泄漏与矛盾两侧来自作者 HMB README 公开的灵枢弱点 | 合成语料由我们生成，对词面检索友好；见上方偏差信号 |
+| 去重/新奇 dedup（15） | 21.51 | 22.66 | 100.00 | M5 去重（`core.py:2796-2824`，含成败极性、条件空间）；H1 前馈新奇（`core.py:5445-5449`、`longterm_gate.py`） | 「应合并 / 不应合并」的变体类别由我们划定 |
+| 对抗 robust（10） | 72.94 | 91.76 | 98.82 | 可溯源、存储逐字可定位（作者 HMB 记灵枢 47.8%）；值域、每线程连接（`core.py:528-542`）、M13 完整性与导出导入 | 空值/越界等未声明行为按「拒绝或钳制都算对」判 |
+| 变形一致 meta（10） | 61.36 | 62.76 | 99.38 | 二元组相似度与空白标点无关、README「确定性优先」 | — |
+| 因果 causal（10） | 77.62 | 76.22 | 92.84 | `reason_causal`、`has_causal_cycle` O(V+E)、`find_cycles` 完整枚举（#145） | 含耗时子项，受负载影响 |
+| 稳定 stability（5） | 0.00 | 98.64 | 100.00 | 衰减/保护/自我历史有界（`core.py:1374`、`3362`、`361`） | base 首段超时记 0（`LEADERBOARD_HARD.md`） |
+| 世界 world（15） | 64.86 | 78.79 | 87.74 | `hex_gen` 构造性验证、`scene_simulator` 确定性行为、`stcnn` 时空原语、`hex_train` | 像素预言机与不变量判据由我们编写 |
+| HMB hmb（10） | 39.90 | 40.30 | 54.34 | 读入 §4.1 的 HMB r1 读数（ng 取 ng@1a2bc2b 臂），不是本轮重测 | 与第一层重复计入 |
+| LLM 判官 llm（5） | 32.50 | 31.25 | 90.00 | `recall`「记忆参与推理」 | 同模型双判官 |
+
+复现单个维度：`PYTHONPATH=<快照根> python3 evalsuite_hard/runner.py --impl ng --dim meta --seed 0`（`--impl legacy` 测旧实现；`--dim` 取 scale/retrieval/dedup/robust/meta/causal/stability/world 等，见 `evalsuite_hard/README.md`）。全榜：§3 的 `run_hard.py` 命令。
+
+### 4.4 规模维度（arch-scale，已合入本快照）
+
+只改写入、激活、自检路径，不碰检索/召回。方案与逐步读数见 `ARCH_SCALE_LOG.md`，复现脚本在 `tools/scale/`。以下为 50k 节点、共享 2 核沙箱上的读数：
+
+| 项目 | ng（arch-scale） | base（上游 @2bb8291） | 出处 |
+|---|---|---|---|
+| 灌库 | 3.40 s / 3.45 s | 3.75 s / 3.73 s | `evalsuite/out/arch_scale_s5b.json`、`arch_scale_s5_perf.json` 的 `perf.<快照>.50000.build_s`（两轮） |
+| 激活 | 39.0 ms / 42.9 ms | 145 ms / 149 ms | 同上，`activation`（S5 前的 ng-prev 为 41.1 / 37.9 ms，S5 未改激活路径） |
+| 冷自检（HARD 口径：decay×2 后单次冷 self_check，新进程 5 次中位） | 18.4 ms（合入前 ng@a3fb0ae 49.3 ms） | 约 60 ms | `ARCH_SCALE_LOG.md`「rebase 到 ng」节与 S6 节（`tools/scale/sc_hard.py`） |
+| **代价**：灌库后首次读取（不计分） | 2.30 s / 2.31 s | 0.015 s | 同上两份 json 的首读列；延后建的读路径索引和内容键在首读时一次付清 |
+
+- 这些都是我们自己的测法和自选操作集，属于第二层证据。
+- 先前在 HMB e2e 语料上看到 search 慢了约 8%（143→158 ms）。复核时两版交叉跑，SQLite VDBE 指令数、Python 调用数和结果哈希都相同（确定性计数，与机器负载无关），墙钟差在同组合重复测量的波动之内，判定为机器负载噪声（`ARCH_SCALE_LOG.md`「S5 的 HMB e2e search 复核」节，`tools/scale/hmb_ops.py`）。
+- 没跑完：HARD 规模维的三方对照（base / integrated / arch-scale，run 名 `scale_s6`），命令见 `ARCH_SCALE_LOG.md`「未完成」节。
+
+## 5. 如实声明
+
+- **测评口径与作者的差异**（HMB）：①统一切块（作者各家原生切块不同）；②矛盾对/地基句用公开 cards 机械构造的**代理清单**（作者 9 对未公开，见 `evalsuite_hmb/out/hmb_proxy_lists.json`）；③两个判官为**同一模型**（deepseek-v4.1-flash）的两个独立实例（不同温度/种子），并过锚自证硬闸；④生成与判分均为**单次采样**；⑤干预轮作者答案键未公开，只报机械依据轴。详见 `evalsuite_hmb/REPORT_HMB.md` §0。
+- **自建测评**（r 系列与 HARD 榜）的题目与判分由我们设计，存在自评偏差（§4.2、§4.3），不等同于上游官方结论。测量机为共享 2 核沙箱，性能/时延读数受负载影响（各报告已注明）。
+- **测评版本与发布快照不一致**：r6 用 ng@c2ffcbb，HARD r2/r3 用 ng@fbeea8c / ng@86c4e14，HMB 检索轨 r1 与生成轨用 ng@d523cfd，c2 与语义第二路引擎实测用 ng@fa1d346 工作树，规模读数用 arch-scale 分支各提交；本快照为 ng@875d838（均为其祖先）。
+- **已知未完成项**：
+  - HARD 榜 r4（空闲机重测）未完成、未出分，续跑命令见 `evalsuite_hard/LEADERBOARD_HARD.md`；
+  - HARD 规模维三方对照 `scale_s6` 未跑（`ARCH_SCALE_LOG.md`「未完成」）；
+  - HMB 生成轨读数用的是 `ng@d523cfd`，没有用新检索配置重跑；
+  - `evalsuite_hard/hmbq/run_hmbq.py` 里 `HMBD`、`REPO` 写死了我们本机的绝对路径，其它测评脚本与各 README 的示例命令也有本机路径，复跑需改成自己的；
+  - 上游 #326–#329 已入台账但还没处理（`upstream-watch/`），上游 main `83cce59` 也未合入 integrated-v3；integrated-v3 另有 4 个修复分支未合入（`fixes-v3/README.md`）。
+- **与上游的关系**：本目录是基于上游意图的独立重写与测评，不是上游官方版本；上游仍是真源。我们在上游的 issue/PR 交互通过 `upstream-watch/` 台账去重，避免重复提交。
+
+## 6. 已知局限与审查回应
+
+外部审查结论为「可以合，但先改 P1」。两条 P1 及处理如下。
+
+### 6.1 「远超旧项目」的说法撑不住，评分基本是自己出题自己判
+
+- **意见**：自建榜单分差大，但题目与判分都出自重写方，不足以支撑「远超旧项目」。
+- **处理**：
+  - 删掉本目录内所有这类总括说法。原句在 `REWRITE_PLAN.md`「目标」节（「远超旧项目」由自建测评量化证明），已改写为「自建测评给出读数、存在自评偏差」；`README.md` 除本节引述审查意见外不再使用此类表述。
+  - 证据分两层（§4）。外部基准层只用作者 HMB 的题目和指标，逐项写读数：检索轨 cid 召回 ng@d523cfd 0.6541 / integrated-v3 0.5989 / BM25 0.6683，c2 配置 0.680 对 BM25 0.668；生成轨 0.267 对 BM25 0.283。自建层（r6、HARD）每处都写明题目和判分由我们设计、存在自评偏差，并逐维写出对应的上游 issue 或旧项目声明（`evalsuite/ISSUE_COVERAGE.md`、`evalsuite_hard/INTENT_MAP.md`）、偏差来源和单项复现命令。
+  - §4 的数字都按读数文件重新核对过（`leaderboard_r6.json`、`hard_r2.json`、`hard_r3.json`、`hard_v2_r3.json`、`hmb_r1.json`、`REPORT_HMB_r2_5arm.md`、`ITER_HMBQ.md`）。
+- **仍存在的局限**：没有第三方独立跑过这两套自建测评；HMB 也是我们自己跑的，代理清单与判官提示词由我们构造。
+
+### 6.2 打包问题
+
+- **意见**：`tests_ng/nn/test_quality_nn.py::test_compat_surface_covers_legacy_tests` 在上游 `tests/` 目录缺失时失败，发布包按说明跑测试不是全绿。
+- **处理**：
+  - 在 ng 源仓库（分支 `ng`）提交 `a3fb0ae`，只改这一个文件：上游 `tests/` 不存在、或其中没有 `test_hex_*` / `test_stcnn_*` 时，用 `pytest.skip` 跳过并写明原因（发布包未收录上游 `tests/`，无法核对 compat 表面；把上游 `tests/` 放到仓库根即可启用）。目录存在时的检查逻辑不变。该提交已包含在本快照 `875d838` 中。
+  - 核查 `pyproject.toml`：记忆核心零依赖，world/nn/gen 的 numpy/Pillow 区间、`dev`（pytest）、`accel`（scipy）均已声明。发布副本做了两处改动（ng 源仓库未改）：新增 `semantic = ["onnxruntime", "tokenizers"]`，补上原先只在 README 里提到的语义第二路依赖；把指向不存在的 README 小节的一行注释改为指向本 README §3。
+  - README §3 的快速开始改为 `pip install -e ".[full,dev]"`，并列出全部可选依赖分组。原 README 写的「激活对照测试需要 scipy」不准确，已更正：`tests_ng` 在没有 SciPy 的环境里全部通过。
+  - 在 `/tmp` 新建干净 venv，逐字执行快速开始：1978 passed、1 skipped（即上面这条），另做了非 editable 安装与无 extras 安装的导入/冒烟检查（§3）。
+- **仍存在的局限**：
+  - （rel-v1.18 已解决）包名原先沿用上游的 `lingshu` 并同时装入旧版副本 `lingshu/`；现在发行包为 `lingshu-ng`，只含 `lingshu_ng`，可与上游 `lingshu` 并存。
+  - 意图守卫（`tests_ng/intent/`）与上面那条 compat 表面测试需要上游 `tests/`，本目录不收录。
+  - （rel-v1.18）`semantic` extra 已由 `embed` 取代，带版本区间（onnxruntime>=1.31,<2、tokenizers>=0.23,<1）。
+
+## 7. 许可
+
+上游 [FuRongJun-1999/lingshu](https://github.com/FuRongJun-1999/lingshu) 使用 **MIT License**（Copyright (c) 2026 FuRongJun-1999）。本目录是基于该项目意图的重写，遵循同一许可证，同一份许可证文本见 [`LICENSE`](LICENSE)。
