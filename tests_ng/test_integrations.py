@@ -87,11 +87,11 @@ def test_http_same_as_engine(server, tmp_path, monkeypatch):
         _, r = _req(base, "POST", "/v1/recall", {"query": q, "limit": 5})
         mine = [(n.content, round(float(s), 6)) for n, s in e.recall(q, 5)["hits"]]
         got = [(h["content"], h["score"]) for h in r["hits"]]
-        # 分数逐位相同；同分（6 位小数）组内先后取决于 created_at 是否同刻（Windows 时钟粒度粗），组内按集合比
-        assert [s for _, s in got] == [s for _, s in mine]
-        # 截断边界上的同分组可能选中不同成员（limit 截在同分组中间），只要求边界分以上的成员集合相同
-        cut = mine[-1][1] if mine else None
-        assert sorted(x for x in got if x[1] != cut) == sorted(x for x in mine if x[1] != cut)
+        # 分数含时间衰减项（两库写入时刻不同 ⇒ ~1e-6 漂移）且同分组先后取决于时钟粒度：
+        # 分数按 1e-4 容差逐位比；明显高于截断边界分的成员集合须相同；边界同分组成员只要求合法
+        assert len(got) == len(mine) and all(abs(a[1] - b[1]) <= 1e-4 for a, b in zip(got, mine))
+        cut = mine[-1][1] if mine else 0.0
+        assert sorted(c for c, sc in got if sc > cut + 1e-4) == sorted(c for c, sc in mine if sc > cut + 1e-4)
         assert all(c in texts for c, _ in got)
     e.close()
 
