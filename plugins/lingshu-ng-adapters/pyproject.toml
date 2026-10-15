@@ -1,0 +1,37 @@
+# lingshu-ng-adapters：灵枢 ng 的生态兼容层插件包（ent-compat）。核心 lingshu-ng 零依赖；本包必需依赖也只有 lingshu-ng。
+# langchain / llamaindex 两组适配器的第三方库是可选 extra（缺库时导入对应子模块抛 MissingDependencyError，写明怎么装）。
+# 可选库版本区间依据实测（Python 3.12：langchain-core 1.6.10 · llama-index-core 0.14.25；mem0 对照签名 mem0ai 2.2.1），区间外未测不承诺。
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lingshu-ng-adapters"
+dynamic = ["version"]
+description = "灵枢 ng 插件：mem0 兼容 API、LangChain / LlamaIndex 适配器、MCP 官方 memory server 工具名对齐"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+dependencies = ["lingshu-ng>=1.30,<2"]
+
+[project.entry-points."lingshu_ng.plugins"]
+adapters = "lingshu_ng_adapters.plugin:PLUGIN"
+
+[project.scripts]
+lingshu-ng-mcp-memory = "lingshu_ng_adapters.mcp_memory:main"
+
+[project.optional-dependencies]
+langchain = ["langchain-core>=1.6,<2"]
+llamaindex = ["llama-index-core>=0.14,<0.15"]
+all = ["langchain-core>=1.6,<2", "llama-index-core>=0.14,<0.15"]
+dev = ["pytest"]
+
+[project.urls]
+Source = "https://github.com/TanPowasd/LingShu-prime/tree/main/Liyang/plugins/lingshu-ng-adapters"
+
+[tool.setuptools.dynamic]
+version = { attr = "lingshu_ng_adapters.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["lingshu_ng_adapters", "lingshu_ng_adapters.*"]
