@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import logging
 import shutil
 import sqlite3
 import sys
@@ -65,6 +66,7 @@ def run_doctor(db: Optional[str], env: Optional[Dict[str, str]] = None) -> Dict:
         caps = capabilities()
         checks.append(_chk("optional", "ok", ",".join(sorted(map(str, caps)))[:200] if hasattr(caps, "__iter__") else "已加载"))
     except Exception as e:  # 可选件缺失不算故障
+        logging.getLogger(__name__).warning("doctor: 能力探测失败 %s", type(e).__name__)
         checks.append(_chk("optional", "warn", f"能力探测失败：{type(e).__name__}"))
     bad = [c for c in checks if c["status"] == "fail"]
     return {"ok": not bad, "checks": checks}
