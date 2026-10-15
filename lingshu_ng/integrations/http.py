@@ -16,6 +16,9 @@
 - 缺省只绑 ``127.0.0.1``。绑非回环地址必须同时给令牌（``--token`` 或环境变量 ``LINGSHU_NG_TOKEN``），否则拒绝启动。
 - 设了令牌后，除 ``/healthz`` 外每个请求须带 ``Authorization: Bearer <令牌>``（常数时间比较）。
 - 不做 TLS、不做多用户；要对外暴露请放在反向代理（TLS + 访问控制）之后。
+- sec-r1：只绑回环时只认回环 ``Host``（挡 DNS 重绑定，403）；无令牌时带非回环 ``Origin`` 的请求一律 403（挡跨站写入）；
+  每连接读超时 :data:`REQUEST_TIMEOUT` 秒（挡慢速连接）；``Transfer-Encoding`` 不支持（501，挡请求脱同步）；
+  深嵌套 JSON 记 400。
 """
 from __future__ import annotations
 
@@ -26,6 +29,7 @@ import logging
 import os
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Optional
+from urllib.parse import urlsplit
 
 from .service import BadRequest, Service
 
@@ -35,6 +39,8 @@ MAX_BODY = 1 << 20
 #: 超限请求体在回 413 之前最多读掉（丢弃）这么多字节，客户端才能读到 413 而不是写到一半被断开（Broken pipe）；更大的直接断开
 _DRAIN_CAP = 4 * MAX_BODY
 TOKEN_ENV = "LINGSHU_NG_TOKEN"
+#: 每连接读超时（秒）：请求行 / 头 / 正文迟迟不到就断开，慢速连接不会无限占住线程（sec-r1）
+REQUEST_TIMEOUT = 30.0
 _GET = {"/v1/status": "status", "/v1/capabilities": "capabilities"}
 _POST = {"/v1/perceive": "perceive", "/v1/recall": "recall"}
 
@@ -49,9 +55,18 @@ def is_loopback(host: str) -> bool:
         return False
 
 
+def _host_of(value: str) -> str:
+    """``Host`` 头 / ``Origin`` 里的主机名（去端口、去 IPv6 方括号）；解析不了返回空串。"""
+    try:
+        return (urlsplit("//" + value.strip()).hostname or "").lower()
+    except ValueError:
+        return ""
+
+
 class _Handler(BaseHTTPRequestHandler):
     server_version = "lingshu-ng"
     protocol_version = "HTTP/1.1"
+    timeout = REQUEST_TIMEOUT
 
     def log_message(self, fmt, *args):  # 走 logging，不写 stderr
         _log.debug("%s " + fmt, self.address_string(), *args)
@@ -76,6 +91,23 @@ class _Handler(BaseHTTPRequestHandler):
         if not ok:
             self._err(401, "缺少或错误的 Authorization: Bearer 令牌")
         return ok
+
+    def _guard(self) -> bool:
+        """sec-r1：Host / Origin / Transfer-Encoding 检查；不通过时已回错误，返回 False。"""
+        if self.headers.get("Transfer-Encoding"):
+            self.close_connection = True
+            self._err(501, "不支持 Transfer-Encoding，请用 Content-Length")
+            return False
+        if self.server.loopback_only and not is_loopback(_host_of(self.headers.get("Host", ""))):
+            self._err(403, "Host 不是回环地址（服务只绑本机）")
+            return False
+        origin = self.headers.get("Origin")
+        if origin is not None and not self.server.token:
+            o = urlsplit(origin.strip())
+            if o.scheme not in ("http", "https") or not is_loopback((o.hostname or "").lower()):
+                self._err(403, "拒绝跨站请求（Origin 非本机）；需要跨站访问请设置令牌")
+                return False
+        return True
 
     def _body(self):
         n = int(self.headers.get("Content-Length") or 0)
@@ -112,7 +144,7 @@ class _Handler(BaseHTTPRequestHandler):
         path = self.path.split("?", 1)[0]
         if path == "/healthz":
             return self._send(200, {"ok": True})
-        if not self._authorized():
+        if not self._guard() or not self._authorized():
             return None
         if path in _POST:
             return self._err(405, "该路径只接受 POST")
@@ -123,7 +155,7 @@ class _Handler(BaseHTTPRequestHandler):
     def do_POST(self):  # noqa: N802
         """POST 路由。"""
         path = self.path.split("?", 1)[0]
-        if not self._authorized():
+        if not self._guard() or not self._authorized():
             return None
         if path in _GET:
             return self._err(405, "该路径只接受 GET")
@@ -137,17 +169,22 @@ class _Handler(BaseHTTPRequestHandler):
             return self._err(413, f"请求体超过 {MAX_BODY} 字节")
         except (ValueError, UnicodeDecodeError) as e:
             return self._err(400, f"JSON 解析失败：{e}")
+        except RecursionError:
+            return self._err(400, "JSON 解析失败：嵌套过深")
         return self._run(_POST[path], body)
 
 
 class Server(ThreadingHTTPServer):
     """持有 :class:`Service` 与令牌的 HTTP 服务。"""
     daemon_threads = True
+    #: listen 积压队列（缺省 5 在突发并发下会被内核 RST，sec-r1）
+    request_queue_size = 128
 
     def __init__(self, service: Service, host: str = "127.0.0.1", port: int = 8765, token: Optional[str] = None):
         if not is_loopback(host) and not token:
             raise PermissionError(f"绑定非回环地址 {host} 必须设置令牌（--token 或 {TOKEN_ENV}）")
         self.service, self.token = service, token or None
+        self.loopback_only = is_loopback(host)
         super().__init__((host, port), _Handler)
 
 
