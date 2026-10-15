@@ -322,6 +322,24 @@ class NodeRepo:
         for r in self.db.iterate(sql + " ORDER BY created_at, id", params):
             yield Node.from_row(tuple(r))
 
+    def page(self, layer: Optional[MemoryLayer] = None, tag: Optional[str] = None,
+             offset: int = 0, limit: int = 50) -> tuple:
+        """分页列出（写入序倒序，最新在前）：返回 ``(节点列表, 符合条件的总数)``。``tag`` 精确匹配（N2）。"""
+        where: List[str] = []
+        params: List[Any] = []
+        if layer is not None:
+            where.append("layer=?")
+            params.append(MemoryLayer.coerce(layer).value)
+        if tag is not None:
+            where.append("EXISTS (SELECT 1 FROM json_each(CASE WHEN json_valid(nodes.tags) THEN nodes.tags "
+                         "ELSE '[]' END) WHERE value = ?)")
+            params.append(tag)
+        cond = f" WHERE {' AND '.join(where)}" if where else ""
+        total = int(self.db.scalar(f"SELECT COUNT(*) FROM nodes{cond}", tuple(params), default=0))
+        rows = self.db.all(f"{_SELECT}{cond} ORDER BY rowid DESC LIMIT ? OFFSET ?",
+                           (*params, int(limit), int(offset)))
+        return [Node.from_row(tuple(r)) for r in rows], total
+
     def count(self, layer: Optional[MemoryLayer] = None) -> int:
         """节点计数。"""
         if layer is None:
