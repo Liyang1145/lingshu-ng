@@ -430,7 +430,8 @@ def test_audit_log_file(tmp_path):
             h.flush()
         rec = json.loads(p.read_text(encoding="utf-8").strip().splitlines()[-1])
         assert rec["op"] == "perceive" and rec["node_id"] == "n1"
-        assert (os.stat(p).st_mode & 0o777) == 0o600
+        if os.name == "posix":                      # Windows 无 POSIX 权限位（由 ACL 管理）
+            assert (os.stat(p).st_mode & 0o777) == 0o600
     finally:
         for h in lg.handlers[:]:
             if h not in before:
