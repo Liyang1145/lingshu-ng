@@ -40,3 +40,7 @@ scrape_configs:
 | 库打不开/报 schema | 版本不匹配；`lingshu-ng doctor`，必要时回滚并 restore |
 | /metrics 401 | 抓取端未带令牌 |
 | 磁盘紧张 | doctor 报告余量；清旧备份 |
+
+## 请求体大小上限
+
+`LINGSHU_NG_MAX_BODY`（字节，缺省 1048576，合法范围 1024–268435456，非法值回退缺省）限制普通写请求体，超限回 413；进程启动时读取，改后需重启。`/v1/import` 另有固定上限（32 MiB）。

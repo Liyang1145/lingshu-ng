@@ -52,8 +52,20 @@ from urllib.parse import parse_qs, unquote, urlsplit
 from .service import BadRequest, Conflict, NotFound, Service
 
 _log = logging.getLogger("lingshu_ng.integrations.http")
-#: 请求体上限（字节）
-MAX_BODY = 1 << 20
+MAX_BODY_ENV = "LINGSHU_NG_MAX_BODY"
+
+
+def _env_body_cap(default: int = 1 << 20) -> int:
+    """E9-3：LINGSHU_NG_MAX_BODY（字节，1024..256MiB）；非法值回退缺省，不让服务起不来。"""
+    try:
+        v = int(os.environ.get(MAX_BODY_ENV) or default)
+    except ValueError:
+        return default
+    return v if 1024 <= v <= (256 << 20) else default
+
+
+#: 请求体上限（字节），缺省 1 MiB，可由 LINGSHU_NG_MAX_BODY 覆盖（进程启动时读取）
+MAX_BODY = _env_body_cap()
 #: 超限请求体在回 413 之前最多读掉（丢弃）这么多字节，客户端才能读到 413 而不是写到一半被断开（Broken pipe）；更大的直接断开
 _DRAIN_CAP = 4 * MAX_BODY
 TOKEN_ENV = "LINGSHU_NG_TOKEN"

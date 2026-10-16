@@ -168,7 +168,8 @@ def test_cli_commands(tmp_path):
     run = lambda *a: subprocess.run([sys.executable, "-m", "lingshu_ng", *a], env=ENV, capture_output=True,
                                     text=True, timeout=60, cwd=str(tmp_path))
     import lingshu_ng
-    assert json.loads(run("version").stdout) == {"version": lingshu_ng.__version__}
+    v = json.loads(run("version").stdout)
+    assert v["version"] == lingshu_ng.__version__ and {"schema", "python", "optional"} <= set(v)
     assert json.loads(run("perceive", "--db", db, "命令行写入测试", "--tag", "cli").stdout)["action"] == "created"
     r = json.loads(run("recall", "--db", db, "命令行 写入", "--limit", "2").stdout)
     assert r["hits"][0]["tags"] == ["cli"]

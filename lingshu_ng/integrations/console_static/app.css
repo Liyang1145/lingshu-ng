@@ -74,3 +74,4 @@ dl.kv dd { margin: 0; word-break: break-all; }
 .confirm-box { border: 1px solid var(--danger); border-radius: 8px; padding: 10px 12px; margin-top: 12px; }
 .toast { position: fixed; bottom: 20px; right: 20px; background: var(--fg); color: var(--bg); padding: 10px 14px; border-radius: 8px; z-index: 30; max-width: 420px; }
 .toast.err { background: var(--danger); color: #fff; }
+td.nowrap { white-space: nowrap; }

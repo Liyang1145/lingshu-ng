@@ -219,7 +219,7 @@
         var p = plugins[k] || {};
         tb.appendChild(h("tr", null, h("td", { text: p.name || k }), h("td", { class: "mono", text: p.distribution || "" }),
           h("td", { class: "mono", text: p.version || "" }), h("td", { text: p.source || "" }),
-          h("td", null, tagChips(p.provides || [])), h("td", { class: p.error ? "error" : "ok", text: p.error || t("ok") })));
+          h("td", null, tagChips(p.provides || [])), h("td", { class: (p.error ? "error" : "ok") + " nowrap", text: p.error || t("ok") })));
       });
       if (!Object.keys(plugins).length) { tb.appendChild(h("tr", null, h("td", { colspan: "6", class: "muted", text: t("none") }))); }
       pt.appendChild(tb);

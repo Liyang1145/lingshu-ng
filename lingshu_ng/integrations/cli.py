@@ -83,7 +83,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         import platform
         try:
             from ..store.schema import SCHEMA_VERSION as _sv
-        except Exception:
+        except ImportError:
             _sv = None
         opt = {m: importlib.util.find_spec(m) is not None for m in ("numpy", "onnxruntime")}
         _print({"version": __version__, "schema": _sv, "python": platform.python_version(), "optional": opt})
