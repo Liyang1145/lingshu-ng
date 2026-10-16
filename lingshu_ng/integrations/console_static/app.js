@@ -65,7 +65,28 @@
       auto_refresh: "每 10 秒自动刷新", updated_at: "更新于 {t}", connected: "已连接", disconnected: "未连接",
       copy: "复制", copied: "已复制", theme_light: "浅色", theme_dark: "深色", theme_system: "跟随系统",
       shortcuts: "键盘快捷键", sc_nav: "切换页面", sc_search: "聚焦检索", sc_help: "显示本帮助", sc_close: "关闭面板 / 对话框",
-      sc_submit: "提交写入", retry: "重试"
+      sc_submit: "提交写入", retry: "重试",
+      ln_anchor: "锚点", ln_structure: "结构", ln_knowledge: "知识", ln_context: "情境", ln_self: "自我",
+      tier_off: "关键词检索", tier_v4: "标准检索", tier_v71: "重排增强", tier_v11c: "向量增强", tier_v13: "全量增强",
+      tier_sub_off: "语义通路已关闭", tier_sub_v4: "纯规则，无需模型", tier_sub_model: "已加载本地模型",
+      retrieval_mode: "检索模式", nodes_sub: "库文件 {f}", schema_sub: "存储结构版本",
+      act_created: "新建", act_updated: "已合并到相似记忆", act_unchanged: "与已有记忆重复，未改动", act_error: "失败",
+      src_source_tree: "随包内置", src_entry_point: "已安装扩展", more_n: "+{n}",
+      recent_title: "最近写入", view_all: "查看全部", welcome_title: "欢迎使用 lingshu-ng",
+      welcome_sub: "记忆库还是空的。三步就能跑起来：",
+      w1_t: "写入第一条记忆", w1: "一条一事，写清主体。", w2_t: "试一次检索", w2: "用自然语言提问，看看命中与排序。",
+      w3_t: "接入你的应用", w3: "通过 HTTP、MCP 或 Python SDK 调用，详见 docs/INTEGRATION_ng.md。",
+      advanced: "高级：运行时配置（JSON）", relevance: "相关度", raw_score: "原始分数 {s}",
+      try_these: "试试这些", modality_text: "文本", edges_none: "暂无关联",
+      rel_causal: "因果", rel_sequential: "先后", rel_correlational: "相关", rel_cyclic: "循环", rel_hierarchical: "从属",
+      rel_spatial_adjacent: "相邻", rel_spatial_contains: "包含", rel_spatial_connected: "连通", rel_similar: "相似",
+      rel_opposite: "矛盾", rel_applies_to: "适用于",
+      healthy_sub2: "已稳定运行 {d}，全部检查通过。", conn_limit: "并发上限", rejected: "因繁忙拒绝",
+      latency_title: "接口延迟", latency_sub: "按路由统计，自本次启动起", route: "路由", calls: "调用次数",
+      p50: "P50", p95: "P95", avg: "平均", no_latency: "还没有接口调用记录",
+      responses_title: "响应状态", code: "状态码", net_err: "无法连接到 lingshu-ng 服务，请确认它仍在运行。",
+      theme_switched: "已切换为{m}主题", theme_switched_sys: "主题已改为跟随系统", started_fmt: "启动于 {t}",
+      footer_local: "数据只保存在本机"
     },
     en: {
       console: "Console", nav_workspace: "Workspace", tab_overview: "Overview", tab_search: "Search", tab_browse: "Browse", tab_write: "Write",
@@ -119,7 +140,28 @@
       auto_refresh: "Auto-refresh every 10s", updated_at: "Updated {t}", connected: "Connected", disconnected: "Disconnected",
       copy: "Copy", copied: "Copied", theme_light: "Light", theme_dark: "Dark", theme_system: "System",
       shortcuts: "Keyboard shortcuts", sc_nav: "Switch page", sc_search: "Focus search", sc_help: "Show this help", sc_close: "Close panel / dialog",
-      sc_submit: "Submit a memory", retry: "Retry"
+      sc_submit: "Submit a memory", retry: "Retry",
+      ln_anchor: "Anchor", ln_structure: "Structure", ln_knowledge: "Knowledge", ln_context: "Context", ln_self: "Self",
+      tier_off: "Keyword", tier_v4: "Standard", tier_v71: "Reranked", tier_v11c: "Vector-boosted", tier_v13: "Full",
+      tier_sub_off: "Semantic path disabled", tier_sub_v4: "Rule-based, no model needed", tier_sub_model: "Local models loaded",
+      retrieval_mode: "Retrieval mode", nodes_sub: "Store file {f}", schema_sub: "Storage schema version",
+      act_created: "created", act_updated: "merged into a similar memory", act_unchanged: "duplicate of an existing memory, unchanged", act_error: "failed",
+      src_source_tree: "Bundled", src_entry_point: "Installed extension", more_n: "+{n}",
+      recent_title: "Recently written", view_all: "View all", welcome_title: "Welcome to lingshu-ng",
+      welcome_sub: "Your memory store is empty. Three steps to get going:",
+      w1_t: "Write your first memory", w1: "One fact each, with a clear subject.", w2_t: "Try a search", w2: "Ask in plain language and check the hits and ranking.",
+      w3_t: "Connect your app", w3: "Call it over HTTP, MCP or the Python SDK. See docs/INTEGRATION_ng.md.",
+      advanced: "Advanced: runtime configuration (JSON)", relevance: "Relevance", raw_score: "Raw score {s}",
+      try_these: "Try these", modality_text: "Text", edges_none: "No links yet",
+      rel_causal: "causes", rel_sequential: "precedes", rel_correlational: "correlates", rel_cyclic: "cycle", rel_hierarchical: "belongs to",
+      rel_spatial_adjacent: "adjacent", rel_spatial_contains: "contains", rel_spatial_connected: "connected", rel_similar: "similar",
+      rel_opposite: "contradicts", rel_applies_to: "applies to",
+      healthy_sub2: "Up for {d}. All checks passing.", conn_limit: "Connection cap", rejected: "Rejected (busy)",
+      latency_title: "API latency", latency_sub: "Per route, since this start", route: "Route", calls: "Calls",
+      p50: "P50", p95: "P95", avg: "Avg", no_latency: "No API calls recorded yet",
+      responses_title: "Responses", code: "Status", net_err: "Cannot reach the lingshu-ng server. Make sure it is still running.",
+      theme_switched: "Switched to {m} theme", theme_switched_sys: "Theme now follows the system", started_fmt: "Started {t}",
+      footer_local: "Data stays on this machine"
     }
   };
 
@@ -238,10 +280,12 @@
   function fmtDur(s) {
     s = Math.floor(s || 0);
     var d = Math.floor(s / 86400), hh = Math.floor(s % 86400 / 3600), mm = Math.floor(s % 3600 / 60), ss = s % 60;
-    if (d) { return d + "d " + hh + "h " + mm + "m"; }
-    if (hh) { return hh + "h " + mm + "m " + ss + "s"; }
-    if (mm) { return mm + "m " + ss + "s"; }
-    return ss + "s";
+    var zh = state.lang === "zh";
+    var u = zh ? [" 天 ", " 小时 ", " 分 ", " 秒"] : ["d ", "h ", "m ", "s"];
+    if (d) { return (d + u[0] + hh + u[1]).trim(); }
+    if (hh) { return (hh + u[1] + mm + u[2]).trim(); }
+    if (mm) { return mm + u[2] + ss + u[3]; }
+    return ss + u[3];
   }
   function tagChips(tags, ents) {
     var out = [];
@@ -249,7 +293,29 @@
     (ents || []).forEach(function (x) { out.push(h("span", { class: "tag ent", title: x, text: x })); });
     return out;
   }
-  function layerBadge(l) { return h("span", { class: "layer", "data-l": l || "", text: l || "—" }); }
+  function layerName(l) { return l ? t("ln_" + l) : "—"; }
+  function layerBadge(l) { return h("span", { class: "layer", "data-l": l || "", title: l || "", text: layerName(l) }); }
+  function relName(r) { var k = "rel_" + r; var v = t(k); return v === k ? r : v; }
+  function actName(a) { var k = "act_" + a; var v = t(k); return v === k ? a : v; }
+  function tierInfo(tier) {
+    var key = tier === "off" ? "off" : (tier === "v4" || tier === "v4-equivalent") ? "v4" : tier === "v7.1" || /casc/.test(tier || "") ? "v71" : tier === "v11c" ? "v11c" : tier === "v13" ? "v13" : null;
+    if (!key) { return { name: tier || "—", sub: "" }; }
+    return { name: t("tier_" + key), sub: key === "off" ? t("tier_sub_off") : key === "v4" ? t("tier_sub_v4") : t("tier_sub_model") };
+  }
+  function baseName(p) { p = String(p || ""); var i = Math.max(p.lastIndexOf("/"), p.lastIndexOf("\\")); return i >= 0 ? p.slice(i + 1) : p; }
+  function meterBar(v) {
+    var w = h("span", { class: "mini-meter", title: fmtNum(v, 2) }), f = h("span");
+    f.style.width = (typeof v === "number" && isFinite(v) ? Math.max(0, Math.min(1, v)) * 100 : 0).toFixed(0) + "%";
+    w.appendChild(f);
+    return h("span", { class: "meter-cell" }, w, h("span", { class: "mono", text: fmtNum(v, 2) }));
+  }
+  function chipsLimited(list, max, ent) {
+    list = list || [];
+    var shown = list.slice(0, max), rest = list.length - shown.length;
+    var out = ent ? tagChips([], shown) : tagChips(shown);
+    if (rest > 0) { out.push(h("span", { class: "tag more", title: list.slice(max).join(", "), text: t("more_n", { n: rest }) })); }
+    return out;
+  }
 
   function copyText(s) {
     function fallback() {
@@ -351,7 +417,7 @@
         }
         return data;
       });
-    }, function (e) { setConn(false); throw new ApiError(0, e && e.message ? e.message : String(e)); });
+    }, function () { setConn(false); throw new ApiError(0, t("net_err")); });
   }
 
   // ------------------------------------------------------------------ 连接状态
@@ -420,17 +486,29 @@
     root.appendChild(pageHead("overview"));
     var sk = skeleton("stats");
     root.appendChild(sk);
-    Promise.all([api("GET", "/v1/status"), api("GET", "/v1/capabilities")]).then(function (res) {
-      var st = res[0] || {}, cap = res[1] || {};
+    Promise.all([api("GET", "/v1/status"), api("GET", "/v1/capabilities"), api("GET", "/v1/nodes?offset=0&limit=5")]).then(function (res) {
+      var st = res[0] || {}, cap = res[1] || {}, recent = (res[2] && res[2].nodes) || [];
+      if (state.view !== "overview") { return; }
       hideLogin();
       clear(root);
       root.appendChild(pageHead("overview", refreshBtn(function () { go("overview"); })));
       var counts = st.counts || {};
-      root.appendChild(h("div", { class: "grid" },
-        stat(t("total_nodes"), fmtInt(st.total), false, "database", st.db ? String(st.db) : null),
-        stat(t("version"), st.version, false, "package"),
-        stat(t("schema_version"), st.schema_version, false, "hash"),
-        stat(t("semantic_tier"), cap.semantic_tier, false, "sparkle")));
+      var tier = tierInfo(cap.semantic_tier);
+      var dbStat = stat(t("total_nodes"), fmtInt(st.total), false, "database", st.db ? t("nodes_sub", { f: baseName(st.db) }) : null);
+      if (st.db) { var ft = dbStat.querySelector(".foot"); if (ft) { ft.title = String(st.db); } }
+      var tierStat = stat(t("retrieval_mode"), tier.name, false, "sparkle", tier.sub);
+      tierStat.title = String(cap.semantic_tier || "");
+      root.appendChild(h("div", { class: "grid" }, dbStat, stat(t("version"), st.version ? "v" + st.version : "", false, "package", "lingshu-ng"),
+        tierStat, stat(t("schema_version"), st.schema_version, false, "hash", t("schema_sub"))));
+
+      if (!st.total) {
+        var steps = [["w1_t", "w1", "pen", "write"], ["w2_t", "w2", "search", "search"], ["w3_t", "w3", "plug", null]];
+        root.appendChild(card({ title: t("welcome_title"), icon: "sparkle", sub: t("welcome_sub"), cls: "welcome", body: h("div", { class: "steps" }, steps.map(function (x, i) {
+          return h("div", { class: "step" + (x[3] ? " clickable" : ""), onclick: x[3] ? function () { navigate(x[3]); } : null, tabindex: x[3] ? "0" : null },
+            h("span", { class: "n", text: String(i + 1) }), h("div", null, h("b", { text: t(x[0]) }), h("span", { text: t(x[1]) })),
+            x[3] ? icon("chevR", "sm") : null);
+        })) }));
+      }
 
       // 层分布
       var total = 0;
@@ -441,14 +519,31 @@
         var n = counts[l] === undefined ? 0 : counts[l];
         var pct = total ? n / total * 100 : 0;
         if (n > 0) {
-          var seg = h("span", { class: "lc-" + l, title: l + " · " + n });
+          var seg = h("span", { class: "lc-" + l, title: layerName(l) + " · " + n });
           seg.style.width = pct.toFixed(2) + "%";
           bar.appendChild(seg);
         }
-        legend.appendChild(h("div", { class: "it lc-" + l, title: t("l_" + l) }, h("span", { class: "sw" }), h("span", { class: "nm", text: l }),
-          h("span", { class: "ct", text: fmtInt(n) }), h("span", { class: "pc", text: total ? Math.round(pct) + "%" : "—" })));
+        legend.appendChild(h("div", { class: "it lc-" + l + (n ? "" : " zero"), title: l },
+          h("span", { class: "sw" }), h("div", { class: "nmw" }, h("span", { class: "nm", text: layerName(l) }), h("span", { class: "ds", text: t("l_" + l) })),
+          h("div", { class: "nums" }, h("span", { class: "ct", text: fmtInt(n) }), h("span", { class: "pc", text: total && n ? Math.round(pct) + "%" : "—" }))));
       });
-      root.appendChild(card({ title: t("layer_counts"), icon: "layers", sub: t("total_nodes") + " " + fmtInt(total), body: [bar, legend] }));
+      var layersCard = card({ title: t("layer_counts"), icon: "layers", sub: t("total_nodes") + " " + fmtInt(total), body: [bar, legend] });
+
+      // 最近写入
+      var rl;
+      if (!recent.length) { rl = emptyState("inbox", t("empty"), null, h("button", { type: "button", class: "sm", onclick: function () { navigate("write"); } }, icon("pen", "sm"), t("go_write"))); }
+      else {
+        rl = h("div", { class: "list recent" }, recent.map(function (n) {
+          var row = h("div", { class: "li clickable", tabindex: "0", onclick: function () { openNode(n.id, function () { go("overview"); }); } },
+            h("span", { class: "txt", text: n.content + (n.truncated ? " …" : "") }), layerBadge(n.layer),
+            h("span", { class: "when", title: fmtTime(n.created_at), text: fmtRel(n.created_at) }));
+          row.addEventListener("keydown", function (ev) { if (ev.key === "Enter") { row.click(); } });
+          return row;
+        }));
+      }
+      var recentCard = card({ title: t("recent_title"), icon: "clock", body: rl, flush: recent.length > 0,
+        right: recent.length ? h("button", { type: "button", class: "ghost sm", onclick: function () { navigate("browse"); } }, t("view_all"), icon("chevR", "sm")) : null });
+      root.appendChild(h("div", { class: "cols-2" }, layersCard, recentCard));
 
       // 插件
       var plugins = cap.plugins || {};
@@ -459,22 +554,23 @@
         var tb = h("tbody");
         keys.forEach(function (k) {
           var p = plugins[k] || {};
-          tb.appendChild(h("tr", null, h("td", null, h("b", { text: p.name || k })), h("td", { class: "mono nowrap", text: p.distribution || "" }),
-            h("td", { class: "num", text: p.version || "" }), h("td", { class: "nowrap muted", text: p.source || "" }),
-            h("td", null, tagChips(p.provides || [])),
-            h("td", { class: "nowrap" }, p.error ? h("span", { class: "badge err", title: p.error }, h("span", { class: "dot err" }), t("fail"))
+          var src = p.source ? (t("src_" + p.source) === "src_" + p.source ? p.source : t("src_" + p.source)) : "";
+          tb.appendChild(h("tr", null, h("td", null, h("div", { class: "pname" }, h("b", { text: p.name || k }), h("span", { class: "mono faint", text: p.distribution || "" }))),
+            h("td", { class: "num", text: p.version || "" }), h("td", { class: "nowrap muted", title: p.source || "", text: src }),
+            h("td", { class: "chips" }, chipsLimited(p.provides || [], 3)),
+            h("td", { class: "nowrap right" }, p.error ? h("span", { class: "badge err", title: p.error }, h("span", { class: "dot err" }), t("fail"))
               : h("span", { class: "badge ok" }, h("span", { class: "dot ok" }), t("ok")))));
         });
-        pbody = h("div", { class: "table-wrap" }, h("table", null, h("thead", null, h("tr", null, h("th", { text: t("name") }), h("th", { text: t("dist") }),
-          h("th", { text: t("version") }), h("th", { text: t("source") }), h("th", { text: t("provides") }), h("th", { text: t("status") }))), tb));
+        pbody = h("div", { class: "table-wrap" }, h("table", null, h("thead", null, h("tr", null, h("th", { text: t("name") }),
+          h("th", { text: t("version") }), h("th", { text: t("source") }), h("th", { text: t("provides") }), h("th", { class: "right", text: t("status") }))), tb));
         keys.forEach(function (k) {
           var p = plugins[k] || {};
           if (p.error) { pbody.appendChild(h("div", { class: "alert err" }, icon("alert"), h("div", { class: "body mono", text: (p.name || k) + ": " + p.error }))); }
         });
       }
-      root.appendChild(card({ title: t("plugins"), icon: "plug", sub: String(keys.length), body: pbody, flush: keys.length > 0 }));
+      var pluginCard = card({ title: t("plugins"), icon: "plug", sub: String(keys.length), body: pbody, flush: keys.length > 0 });
 
-      // 依赖 + 运行时
+      // 依赖
       var deps = cap.dependencies || {};
       var dl = h("div", { class: "list" });
       var dk = Object.keys(deps).sort();
@@ -484,10 +580,8 @@
           h("span", { class: "badge" + (d.available ? " ok" : "") }, h("span", { class: "dot" + (d.available ? " ok" : "") }), d.available ? t("available") : t("unavailable"))));
       });
       if (!dk.length) { dl.appendChild(h("div", { class: "li muted", text: t("none") })); }
-      root.appendChild(h("div", { class: "cols-2 even" },
-        card({ title: t("dependencies"), icon: "package", body: dl, flush: true }),
-        card({ title: t("runtime_cfg"), icon: "cpu", sub: t("models") + " · " + t("engine") + " · " + t("fallbacks"),
-               body: jsonPre({ models: cap.models, engine: cap.engine, fallbacks: cap.fallbacks }) })));
+      root.appendChild(h("div", { class: "cols-2" }, pluginCard, card({ title: t("dependencies"), icon: "package", sub: String(dk.length), body: dl, flush: true })));
+      root.appendChild(h("details", { class: "advanced" }, h("summary", { text: t("advanced") }), jsonPre({ semantic_tier: cap.semantic_tier, models: cap.models, engine: cap.engine, fallbacks: cap.fallbacks })));
     }).catch(function (e) {
       if (e.status !== 401) { clear(root); root.appendChild(pageHead("overview")); root.appendChild(errorBox(e, function () { go("overview"); })); }
     });
@@ -548,7 +642,13 @@
     root.appendChild(h("div", { class: "card search-hero" }, form));
     root.appendChild(out);
     if (state.search.result) { renderHits(out, state.search.result); }
-    else { out.appendChild(h("div", { class: "card" }, emptyState("search", t("search_idle"), t("search_idle_hint")))); }
+    else {
+      var sug = h("div", { class: "suggest" });
+      (state.lang === "zh" ? ["客户偏好", "截止日期", "会议安排"] : ["customer preference", "deadline", "meeting"]).forEach(function (x) {
+        sug.appendChild(h("button", { type: "button", class: "sm", text: x, onclick: function () { q.value = x; run(); } }));
+      });
+      out.appendChild(h("div", { class: "card" }, emptyState("search", t("search_idle"), t("search_idle_hint"), h("div", null, h("div", { class: "faint sug-label", text: t("try_these") }), sug))));
+    }
     q.focus();
   };
 
@@ -570,8 +670,9 @@
         meter.style.width = (maxScore > 0 && typeof n.score === "number" ? Math.max(4, n.score / maxScore * 100) : 0).toFixed(1) + "%";
         list.appendChild(h("article", { class: "hit" },
           h("div", { class: "content" }, highlight(n.content, terms)),
-          h("div", { class: "score" }, h("span", { class: "rank", text: "#" + (i + 1) }), h("b", { text: fmtNum(n.score, 4) }), h("div", { class: "meter" }, meter)),
-          h("div", { class: "meta" }, layerBadge(n.layer), tagChips(n.tags),
+          h("div", { class: "score", title: t("raw_score", { s: fmtNum(n.score, 4) }) }, h("span", { class: "rank", text: "#" + (i + 1) + " · " + t("relevance") }),
+            h("b", { text: (maxScore > 0 && typeof n.score === "number" ? Math.round(n.score / maxScore * 100) : 0) + "%" }), h("div", { class: "meter" }, meter)),
+          h("div", { class: "meta" }, layerBadge(n.layer), chipsLimited(n.tags, 4),
             n.created_at !== undefined ? h("span", { class: "sep" }) : null,
             n.created_at !== undefined ? h("span", { title: fmtTime(n.created_at), text: fmtRel(n.created_at) }) : null,
             h("span", { class: "grow" }),
@@ -591,7 +692,7 @@
     var seg = h("div", { class: "seg", role: "group", "aria-label": t("layer") });
     [""].concat(LAYERS).forEach(function (l) {
       seg.appendChild(h("button", { type: "button", class: l === b.layer ? "on" : "", "data-layer": l, "aria-pressed": l === b.layer ? "true" : "false",
-        text: l || t("all_layers"), onclick: function () { b.layer = l; b.offset = 0; syncSeg(); load(); } }));
+        text: l ? layerName(l) : t("all_layers"), title: l || null, onclick: function () { b.layer = l; b.offset = 0; syncSeg(); load(); } }));
     });
     function syncSeg() {
       Array.prototype.forEach.call(seg.children, function (x) {
@@ -626,8 +727,8 @@
           var tb = h("tbody");
           nodes.forEach(function (n) {
             var tr = h("tr", { class: "clickable", tabindex: "0" }, h("td", { class: "content" }, h("div", { class: "clamp", text: n.content + (n.truncated ? " …" : "") })),
-              h("td", null, layerBadge(n.layer)), h("td", null, tagChips(n.tags, n.entities)),
-              h("td", { class: "num" }, fmtNum(n.importance, 2)), h("td", { class: "num", title: fmtTime(n.created_at), text: fmtRel(n.created_at) }),
+              h("td", null, layerBadge(n.layer)), h("td", null, chipsLimited(n.tags, 3).concat(chipsLimited(n.entities, 2, true))),
+              h("td", { class: "num" }, meterBar(n.importance)), h("td", { class: "num", title: fmtTime(n.created_at), text: fmtRel(n.created_at) }),
               h("td", { class: "act" }, h("button", { type: "button", class: "link", text: t("details"), onclick: function (ev) { ev.stopPropagation(); openNode(n.id, load); } })));
             tr.addEventListener("click", function () { openNode(n.id, load); });
             tr.addEventListener("keydown", function (ev) { if (ev.key === "Enter") { openNode(n.id, load); } });
@@ -679,9 +780,9 @@
       btn.disabled = true;
       api("POST", "/v1/perceive", body).then(function (r) {
         msg.appendChild(h("div", { class: "alert ok", role: "status" }, icon("checkCircle"), h("div", { class: "body" },
-          t("written", { id: r.node_id, action: r.action, layer: r.layer }), " ",
+          t("written", { id: shortId(r.node_id), action: actName(r.action), layer: layerName(r.layer) }), " ",
           h("button", { type: "button", class: "link", text: t("view_node"), onclick: function () { openNode(r.node_id); } }))));
-        toast(t("written", { id: r.node_id, action: r.action, layer: r.layer }));
+        toast(t("written", { id: shortId(r.node_id), action: actName(r.action), layer: layerName(r.layer) }));
         content.value = ""; counter.textContent = "0 / 100000";
         content.focus();
       }).catch(function (e) { msg.appendChild(errorBox(e)); }).then(function () { btn.disabled = false; });
@@ -708,6 +809,7 @@
     content.focus();
   };
 
+  function shortId(id) { id = String(id || ""); return id.length > 18 ? id.slice(0, 13) + "…" + id.slice(-4) : id; }
   function splitList(s) {
     return String(s || "").split(/[,，]/).map(function (x) { return x.trim(); }).filter(function (x) { return x.length > 0; });
   }
@@ -827,15 +929,43 @@
         root.appendChild(h("div", { class: "card" }, h("div", { class: "hero-status" },
           h("div", { class: "big " + (hz.ok ? "ok" : "err") }, icon(hz.ok ? "checkCircle" : "alert")),
           h("div", null, h("h2", { text: hz.ok ? t("healthy") : t("unhealthy") }),
-            h("p", { text: hz.ok ? t("healthy_sub", { d: fmtDur(hl.uptime_s) }) : t("unhealthy_sub") })),
+            h("p", { text: hz.ok ? t("healthy_sub2", { d: fmtDur(hl.uptime_s) }) : t("unhealthy_sub") })),
           h("div", { class: "right" }, h("span", { text: t("updated_at", { t: new Date().toLocaleTimeString(state.lang === "zh" ? "zh-CN" : "en-US", { hour12: false }) }) }),
             h("label", { class: "switch", for: "h-auto" }, sw, h("span", { text: t("auto_refresh") }))))));
+        var started = hl.started_at ? new Date(hl.started_at * 1000).toLocaleString(state.lang === "zh" ? "zh-CN" : "en-US", { hour12: false, month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "";
         root.appendChild(h("div", { class: "grid" },
-          stat(t("version"), hl.version, false, "package"),
-          stat(t("uptime"), fmtDur(hl.uptime_s), false, "clock", t("started_at") + " " + fmtTime(hl.started_at)),
-          stat(t("req_total"), fmtInt(hl.requests_total), false, "swap"),
-          stat(t("req_recent", { w: hl.recent_window_s }), fmtInt(hl.requests_recent), false, "pulse"),
-          stat(t("auth"), hl.auth === "token" ? t("auth_token") : t("auth_loop"), true, "shield")));
+          stat(t("uptime"), fmtDur(hl.uptime_s), false, "clock", started ? t("started_fmt", { t: started }) : null),
+          stat(t("req_total"), fmtInt(hl.requests_total), false, "swap", t("req_recent", { w: hl.recent_window_s }) + " " + fmtInt(hl.requests_recent)),
+          stat(t("conn_limit"), fmtInt(hl.max_conn), false, "cpu", t("rejected") + " " + fmtInt(hl.rejected_busy || 0)),
+          stat(t("auth"), hl.auth === "token" ? t("auth_token") : t("auth_loop"), true, "shield", "v" + (hl.version || "?"))));
+
+        var lat = hl.latency || {}, routes = Object.keys(lat).filter(function (r) { return r !== "other"; }).sort(function (a, b) { return (lat[b].count || 0) - (lat[a].count || 0); });
+        var lbody;
+        if (!routes.length) { lbody = emptyState("pulse", t("no_latency"), null); }
+        else {
+          var maxP95 = 0;
+          routes.forEach(function (r) { maxP95 = Math.max(maxP95, lat[r].p95_ms || 0); });
+          var tb = h("tbody");
+          routes.forEach(function (r) {
+            var x = lat[r], bar = h("span");
+            bar.style.width = (maxP95 ? Math.max(3, (x.p95_ms || 0) / maxP95 * 100) : 0).toFixed(0) + "%";
+            tb.appendChild(h("tr", null, h("td", { class: "mono", text: r }), h("td", { class: "num right", text: fmtInt(x.count) }),
+              h("td", { class: "num right", text: fmtNum(x.avg_ms, 1) + " ms" }), h("td", { class: "num right", text: "≤ " + fmtNum(x.p50_ms, 0) + " ms" }),
+              h("td", { class: "num right" }, h("span", { class: "lat-cell" }, h("span", { class: "lat-bar" }, bar), "≤ " + fmtNum(x.p95_ms, 0) + " ms"))));
+          });
+          lbody = h("div", { class: "table-wrap" }, h("table", null, h("thead", null, h("tr", null, h("th", { text: t("route") }), h("th", { class: "right", text: t("calls") }),
+            h("th", { class: "right", text: t("avg") }), h("th", { class: "right", text: t("p50") }), h("th", { class: "right", text: t("p95") }))), tb));
+        }
+        var resp = hl.responses || {}, codes = Object.keys(resp).sort();
+        var rbody = h("div", { class: "list" });
+        codes.forEach(function (c) {
+          var cls = c[0] === "2" ? "ok" : c[0] === "4" ? "warn" : c[0] === "5" ? "err" : "";
+          rbody.appendChild(h("div", { class: "li" }, h("span", { class: "badge " + cls }, h("span", { class: "dot " + cls }), c), h("span", { class: "grow" }), h("b", { class: "num", text: fmtInt(resp[c]) })));
+        });
+        if (!codes.length) { rbody.appendChild(h("div", { class: "li muted", text: t("none") })); }
+        root.appendChild(h("div", { class: "cols-2" },
+          card({ title: t("latency_title"), icon: "pulse", sub: t("latency_sub"), body: lbody, flush: routes.length > 0 }),
+          card({ title: t("responses_title"), icon: "hash", body: rbody, flush: true })));
       }).catch(function (e) {
         if (e.status !== 401 && !silent) { clear(root); root.appendChild(pageHead("health")); root.appendChild(errorBox(e, function () { load(); })); }
       });
@@ -873,9 +1003,9 @@
         h("dt", { text: t("layer") }), h("dd", null, layerBadge(n.layer)),
         h("dt", { text: t("tags") }), h("dd", null, (n.tags || []).length ? tagChips(n.tags) : h("span", { class: "faint", text: "—" })),
         h("dt", { text: t("entities") }), h("dd", null, (n.entities || []).length ? tagChips([], n.entities) : h("span", { class: "faint", text: "—" })),
-        h("dt", { text: t("importance") }), h("dd", { class: "mono", text: fmtNum(n.importance) }),
-        h("dt", { text: t("confidence") }), h("dd", { class: "mono", text: fmtNum(n.confidence) }),
-        h("dt", { text: t("modality") }), h("dd", { text: n.modality }),
+        h("dt", { text: t("importance") }), h("dd", null, meterBar(n.importance)),
+        h("dt", { text: t("confidence") }), h("dd", null, meterBar(n.confidence)),
+        h("dt", { text: t("modality") }), h("dd", { text: n.modality === "text" ? t("modality_text") : n.modality }),
         h("dt", { text: t("access_count") }), h("dd", { class: "mono", text: n.access_count }),
         h("dt", { text: t("created") }), h("dd", { text: fmtTime(n.created_at) }),
         h("dt", { text: t("last_access") }), h("dd", { text: fmtTime(n.last_access) }),
@@ -911,11 +1041,11 @@
 
   function edgeTable(title, total, edges, onChange) {
     var wrap = h("div", null, h("div", { class: "section-title" }, h("span", { text: title }), h("span", { class: "count", text: String(total) })));
-    if (!edges.length) { wrap.appendChild(h("p", { class: "muted", text: t("none") })); return wrap; }
+    if (!edges.length) { wrap.appendChild(h("p", { class: "muted edge-none", text: t("edges_none") })); return wrap; }
     var tb = h("tbody");
     edges.forEach(function (x) {
       var p = x.peer;
-      tb.appendChild(h("tr", null, h("td", { class: "mono nowrap", text: x.relation }),
+      tb.appendChild(h("tr", null, h("td", { class: "nowrap", title: x.relation }, h("span", { class: "rel rel-" + x.relation, text: relName(x.relation) })),
         h("td", { class: "content" }, p ? h("button", { type: "button", class: "link", text: p.content + (p.truncated ? " …" : ""),
           onclick: function () { openNode(p.id, onChange); } }) : h("span", { class: "muted mono", text: x.source_id + " → " + x.target_id })),
         h("td", { class: "num right", text: fmtNum(x.confidence, 2) }),
@@ -992,7 +1122,7 @@
       state.theme = state.theme === "system" ? "light" : state.theme === "light" ? "dark" : "system";
       try { localStorage.setItem(THEME_KEY, state.theme); } catch (e) { /* 无 */ }
       applyTheme();
-      toast(t("theme_" + state.theme));
+      toast(state.theme === "system" ? t("theme_switched_sys") : t("theme_switched", { m: t("theme_" + state.theme) }));
     });
     $("lang").addEventListener("click", function () {
       state.lang = state.lang === "zh" ? "en" : "zh";

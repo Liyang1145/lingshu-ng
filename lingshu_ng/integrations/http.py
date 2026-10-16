@@ -621,11 +621,25 @@ class Server(ThreadingHTTPServer):
             while self._recent and self._recent[0] < t - RECENT_WINDOW:
                 self._recent.popleft()
             recent, total = len(self._recent), self.requests_total
+            lat = {k: (list(v[0]), v[1], v[2]) for k, v in self._lat.items()}
+            resp = {str(c): n for c, n in sorted(self._responses.items())}
         return {"ok": True, "version": __version__, "started_at": self.started_at,
                 "uptime_s": round(t - self._t0, 3), "requests_total": total,
                 "requests_recent": recent, "recent_window_s": RECENT_WINDOW, "console": bool(self.console),
                 "auth": "token" if self.token else "loopback-only", "max_conn": self.max_conn,
-                "rejected_busy": self.rejected_busy}
+                "rejected_busy": self.rejected_busy, "responses": resp,
+                "latency": {r: self._lat_summary(*v) for r, v in sorted(lat.items())}}
+
+    def _lat_summary(self, buckets, n, total) -> dict:
+        """按直方图桶估计分位数（取桶上界，保守偏大；超出最大桶记为最大桶上界）。单位毫秒。"""
+        def q(p):
+            need = p * n
+            for b, c in zip(self._LAT_BUCKETS, buckets):
+                if c >= need:
+                    return round(b * 1000, 1)
+            return round(self._LAT_BUCKETS[-1] * 1000, 1)
+        return {"count": n, "avg_ms": round(total / n * 1000, 2) if n else 0.0,
+                "p50_ms": q(.5) if n else 0.0, "p95_ms": q(.95) if n else 0.0}
 
 
 def _prom_escape(v) -> str:
