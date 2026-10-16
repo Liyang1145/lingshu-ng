@@ -14,6 +14,7 @@ scrape_configs:
 ```
 - 日志：`LINGSHU_NG_LOG_FORMAT=json` 便于采集。
 - 一键自检：`lingshu-ng doctor`（JSON 输出，有问题时退出码非零，可挂到定时探活）。
+  - 退出码：`0` 全部通过（`ok=true`）；`1` 存在失败项（`ok=false`，见 `checks[].status`）。输出恒为 JSON（含 `ok` 与 `checks`），无需额外 `--json`。
 
 ## 2. 备份
 ```cron
