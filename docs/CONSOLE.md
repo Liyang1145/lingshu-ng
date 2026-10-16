@@ -127,3 +127,13 @@ lingshu-ng console --db ./mem.db --audit-log ./audit.jsonl
 ```bash
 python -m pytest -q tests_ng/test_console.py
 ```
+
+
+## 设计审查
+
+控制台的视觉与文案按两份公开的 agent 设计准则审查，并有一道自动化门禁：
+
+- **impeccable**（pbakaus/impeccable，Apache-2.0）：其确定性检测规则在 CI 的 `design-lint` 任务里扫描全部六个页面（`python tools/design_lint.py`），对比度不足、标题跳级、卡片嵌套、过度使用的字体等任何一项发现都会让 CI 失败。工具只经 `npx` 临时运行，不是 lingshu-ng 的依赖。
+- **frontend-design**（anthropics/skills，Apache-2.0）：作为人工审查清单，去掉了 AI 生成界面的常见痕迹：全大写小标签、用中点拼接的元信息、四张同尺寸指标卡、每次切页的淡入上滑动画、悬停浮起的卡片阴影、渐变色 logo。
+
+据此做的取舍：侧栏用靛墨色外壳承担配色（而非灰底加单一强调色）；品牌标是五条按层配色的「层谱」，与各层分布条同一套颜色；指标改为一条连续的事实带；正文与次要文字对比度均 ≥ 4.5:1；滚动条、光标、选区颜色随主题。两个项目的代码都没有被复制进本仓库。

@@ -86,7 +86,7 @@
       p50: "P50", p95: "P95", avg: "平均", no_latency: "还没有接口调用记录",
       responses_title: "响应状态", code: "状态码", net_err: "无法连接到 lingshu-ng 服务，请确认它仍在运行。",
       theme_switched: "已切换为{m}主题", theme_switched_sys: "主题已改为跟随系统", started_fmt: "启动于 {t}",
-      footer_local: "数据只保存在本机"
+      footer_local: "数据只保存在本机", took_sep: "，", list_sep: "，", rank_n: "第 {n} 名"
     },
     en: {
       console: "Console", nav_workspace: "Workspace", tab_overview: "Overview", tab_search: "Search", tab_browse: "Browse", tab_write: "Write",
@@ -161,7 +161,7 @@
       p50: "P50", p95: "P95", avg: "Avg", no_latency: "No API calls recorded yet",
       responses_title: "Responses", code: "Status", net_err: "Cannot reach the lingshu-ng server. Make sure it is still running.",
       theme_switched: "Switched to {m} theme", theme_switched_sys: "Theme now follows the system", started_fmt: "Started {t}",
-      footer_local: "Data stays on this machine"
+      footer_local: "Data stays on this machine", took_sep: ", ", list_sep: ", ", rank_n: "Rank {n}"
     }
   };
 
@@ -250,6 +250,18 @@
     var p = document.createElementNS(SVG_NS, "path");
     p.setAttribute("d", ICONS[name] || "");
     svg.appendChild(p);
+    return svg;
+  }
+  // 品牌标：五层记忆的「层谱」——五条按层配色、长短不一的横条（灵枢五层：锚点 / 结构 / 知识 / 情境 / 自我）
+  function strataMark() {
+    var svg = document.createElementNS(SVG_NS, "svg");
+    svg.setAttribute("viewBox", "0 0 20 20"); svg.setAttribute("aria-hidden", "true"); svg.setAttribute("class", "strata");
+    [[2, 16, "anchor"], [5, 12, "structure"], [8, 15, "knowledge"], [11, 10, "context"], [14, 13, "self"]].forEach(function (b, i) {
+      var r = document.createElementNS(SVG_NS, "rect");
+      r.setAttribute("x", String(2 + (i % 2))); r.setAttribute("y", String(b[0] + 0.5)); r.setAttribute("width", String(b[1])); r.setAttribute("height", "2.2");
+      r.setAttribute("rx", "1.1"); r.setAttribute("class", "lc-" + b[2]);
+      svg.appendChild(r);
+    });
     return svg;
   }
   function setIcon(btn, name) {
@@ -355,7 +367,7 @@
   function card(opts) {
     var head = null;
     if (opts.title) {
-      head = h("div", { class: "card-head" }, opts.icon ? icon(opts.icon) : null, h(opts.h || "h3", { text: opts.title }),
+      head = h("div", { class: "card-head" }, opts.icon ? icon(opts.icon) : null, h(opts.h || "h2", { text: opts.title }),
         opts.sub ? h("span", { class: "sub", text: opts.sub }) : null,
         opts.right ? h("div", { class: "right" }, opts.right) : null);
     }
@@ -388,7 +400,7 @@
     return b;
   }
   function stat(k, v, small, ic, foot) {
-    return h("div", { class: "stat" }, h("div", { class: "k" }, ic ? h("span", { class: "ic" }, icon(ic, "sm")) : null, h("span", { text: k })),
+    return h("div", { class: "stat" }, h("div", { class: "k" }, h("span", { text: k })),
       h("div", { class: "v" + (small ? " small" : ""), title: small && v ? String(v) : null, text: v === undefined || v === null || v === "" ? "—" : v }),
       foot ? h("div", { class: "foot", title: foot, text: foot }) : null);
   }
@@ -428,7 +440,7 @@
   }
   function pollConn() {
     api("GET", "/v1/health").then(function (hl) {
-      setConn(true, t("connected") + " · v" + (hl.version || "?"), hl.auth === "token" ? t("auth_token") : t("auth_loop"));
+      setConn(true, t("connected"), "v" + (hl.version || "?") + t("list_sep") + (hl.auth === "token" ? t("auth_token") : t("auth_loop")));
     }).catch(function (e) { if (e.status !== 401) { setConn(false); } });
   }
 
@@ -519,7 +531,7 @@
         var n = counts[l] === undefined ? 0 : counts[l];
         var pct = total ? n / total * 100 : 0;
         if (n > 0) {
-          var seg = h("span", { class: "lc-" + l, title: layerName(l) + " · " + n });
+          var seg = h("span", { class: "lc-" + l, title: layerName(l) + " " + n });
           seg.style.width = pct.toFixed(2) + "%";
           bar.appendChild(seg);
         }
@@ -661,16 +673,14 @@
     } else {
       var maxScore = 0;
       hits.forEach(function (n) { if (typeof n.score === "number" && n.score > maxScore) { maxScore = n.score; } });
-      out.appendChild(h("div", { class: "search-meta" }, h("span", { text: t("results_n", { n: hits.length }) }),
-        state.search.ms !== null ? h("span", { class: "faint", text: "·" }) : null,
-        state.search.ms !== null ? h("span", { text: t("took", { ms: state.search.ms }) }) : null));
+      out.appendChild(h("div", { class: "search-meta" }, h("span", { text: t("results_n", { n: hits.length }) + (state.search.ms !== null ? t("took_sep") + t("took", { ms: state.search.ms }) : "") })));
       var list = h("div", { class: "hits" });
       hits.forEach(function (n, i) {
         var meter = h("span");
         meter.style.width = (maxScore > 0 && typeof n.score === "number" ? Math.max(4, n.score / maxScore * 100) : 0).toFixed(1) + "%";
         list.appendChild(h("article", { class: "hit" },
           h("div", { class: "content" }, highlight(n.content, terms)),
-          h("div", { class: "score", title: t("raw_score", { s: fmtNum(n.score, 4) }) }, h("span", { class: "rank", text: "#" + (i + 1) + " · " + t("relevance") }),
+          h("div", { class: "score", title: t("raw_score", { s: fmtNum(n.score, 4) }) }, h("span", { class: "rank", text: t("rank_n", { n: i + 1 }) }),
             h("b", { text: (maxScore > 0 && typeof n.score === "number" ? Math.round(n.score / maxScore * 100) : 0) + "%" }), h("div", { class: "meter" }, meter)),
           h("div", { class: "meta" }, layerBadge(n.layer), chipsLimited(n.tags, 4),
             n.created_at !== undefined ? h("span", { class: "sep" }) : null,
@@ -932,7 +942,7 @@
         if (state.view !== "health") { return; }
         var hz = res[0] || {}, hl = res[1] || {};
         hideLogin();
-        setConn(!!hz.ok, t("connected") + " · v" + (hl.version || "?"), hl.auth === "token" ? t("auth_token") : t("auth_loop"));
+        setConn(!!hz.ok, t("connected"), "v" + (hl.version || "?") + t("list_sep") + (hl.auth === "token" ? t("auth_token") : t("auth_loop")));
         clear(root);
         var sw = h("input", { type: "checkbox", id: "h-auto", checked: autoRefresh });
         sw.addEventListener("change", function () { autoRefresh = sw.checked; arm(); });
@@ -1123,6 +1133,8 @@
     setIcon($("kbd-help"), "keyboard");
     setIcon($("modal-close"), "x");
     $("login-lock").appendChild(icon("lock", "lg"));
+    var logo = document.querySelector(".brand .logo");
+    if (logo) { clear(logo); logo.appendChild(strataMark()); }
     applyLang();
     if (window.matchMedia) {
       var mq = window.matchMedia("(prefers-color-scheme: dark)");
