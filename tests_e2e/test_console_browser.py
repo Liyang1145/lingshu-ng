@@ -65,8 +65,8 @@ def test_full_flow(server, browser):
     page.click("#tabs button[data-view=search]")
     page.fill("#q", "灵枢控制台")
     page.click("#view button[type=submit]")
-    page.wait_for_selector("td.content")
-    assert XSS in page.inner_text("td.content")                      # 作为文本显示
+    page.wait_for_selector(".hit .content")
+    assert XSS in page.inner_text(".hit .content")                      # 作为文本显示
     assert page.evaluate("window.PWN") is None and page.locator("#view img").count() == 0
     # 浏览 + 详情 + 二次确认删除
     page.click("#tabs button[data-view=browse]")
@@ -114,4 +114,49 @@ def test_token_login(server, browser):
     assert page.evaluate("document.cookie") == ""
     assert page.evaluate("sessionStorage.getItem('lingshu_ng_console_token')") == "e2e-secret"
     assert page.evaluate("localStorage.getItem('lingshu_ng_console_token')") is None
+    ctx.close()
+
+
+def test_ui_v2_routing_theme_shortcuts_mobile(server, browser):
+    """UI-2：hash 深链、键盘快捷键、主题持久化、检索高亮、抽屉、移动端菜单，全程无 JS 报错。"""
+    s, url = server()
+    s.service.perceive({"content": "张总只喝乌龙茶，不喝咖啡。", "tags": ["客户"], "entities": ["张总"]})
+    ctx, page, errors = _page(browser)
+    page.goto(url + "#/health")
+    page.wait_for_selector(".hero-status")
+    assert page.locator("#tabs button[data-view=health]").get_attribute("aria-current") == "page"
+    page.keyboard.press("/")                                          # / → 检索并聚焦
+    page.wait_for_selector("#q")
+    assert page.evaluate("location.hash") == "#/search"
+    page.fill("#q", "张总 喝什么")
+    page.keyboard.press("Enter")
+    page.wait_for_selector(".hit mark")
+    assert page.inner_text(".hit mark") == "张总"
+    page.click("body")
+    page.keyboard.press("3")                                          # 数字键切页
+    page.wait_for_selector("tbody tr.clickable")
+    page.click("tbody tr.clickable")                                  # 整行可点 → 抽屉
+    page.wait_for_selector(".detail-content")
+    page.keyboard.press("Escape")
+    page.wait_for_selector("#modal.hidden", state="attached")
+    page.go_back()                                                    # 浏览器后退回到检索
+    page.wait_for_selector("#q")
+    page.click("#theme")                                              # system → light → dark
+    page.click("#theme")
+    assert page.evaluate("document.documentElement.dataset.theme") == "dark"
+    page.reload()
+    page.wait_for_selector("#q")
+    assert page.evaluate("document.documentElement.dataset.theme") == "dark"
+    page.evaluate("document.activeElement.blur()")                    # 输入框里按 ? 不触发快捷键
+    page.keyboard.press("?")
+    page.wait_for_selector("#help-dialog")
+    page.keyboard.press("Escape")
+    assert page.locator("#help-dialog").count() == 0
+    page.set_viewport_size({"width": 390, "height": 800})
+    page.click("#menu")
+    page.wait_for_selector(".app.nav-open")
+    page.click("#tabs button[data-view=overview]")
+    page.wait_for_selector("text=节点总数")
+    assert not page.evaluate("document.getElementById('app').classList.contains('nav-open')")
+    assert not errors, errors
     ctx.close()

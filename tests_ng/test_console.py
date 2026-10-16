@@ -109,7 +109,7 @@ def test_html_has_no_inline_script_or_external_resource():
     assert not re.search(r"\son[a-z]+\s*=", html), "不许内联事件处理器"
     assert not re.search(r"\sstyle\s*=", html), "不许内联样式（CSP style-src 'self'）"
     for name in ("index.html", "app.js", "app.css"):
-        text = _asset(name)
+        text = _asset(name).replace("http://www.w3.org/2000/svg", "")   # SVG 命名空间标识符，不是网络资源
         assert not re.search(r"(https?:)?//[a-z0-9.-]+\.[a-z]{2,}", text, re.I), f"{name} 引用了外部资源"
         assert "@import" not in text and "url(" not in text.replace("createObjectURL(", "").replace("revokeObjectURL(", "")
 
