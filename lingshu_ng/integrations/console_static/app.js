@@ -18,10 +18,10 @@
       tab_exchange: "导入/导出", tab_health: "健康", logout: "退出", login_title: "需要令牌",
       login_hint: "此服务设置了 Bearer 令牌。令牌只保存在本标签页的 sessionStorage 中，关闭标签页即清除。",
       token: "令牌", login: "登录", bad_token: "令牌错误", loading: "加载中…", refresh: "刷新",
-      sub_overview: "记忆库规模、能力档位与已加载组件一览。",
+      sub_overview: "记忆库规模、检索模式、各层分布与已加载组件一览。",
       sub_search: "按语义与关键词混合检索记忆，结果按相关度排序。",
       sub_browse: "按层与标签分页浏览全部记忆节点，点击任一行查看详情。",
-      sub_write: "写入一条新记忆。系统会自动判定所属层，并与已有节点去重合并。",
+      sub_write: "写入一条新记忆。默认存入知识层，并与已有记忆自动去重、合并。",
       sub_exchange: "整库导出为 JSON 备份，或从备份恢复。",
       sub_health: "服务运行状态、请求量与鉴权模式。",
       total_nodes: "节点总数", db_path: "库路径", version: "版本", schema_version: "schema 版本",
@@ -36,7 +36,7 @@
       confidence: "置信度", all_layers: "全部", tag_filter: "按标签筛选（精确）", apply: "筛选", prev: "上一页",
       next: "下一页", page_info: "第 {a}–{b} 条，共 {n} 条", empty: "没有节点", empty_hint: "当前筛选条件下没有记忆。可以去「写入」添加第一条。",
       go_write: "去写入", details: "详情", per_page: "每页",
-      negative: "否定 / 排除", write_title: "写入一条记忆（perceive）", tags_hint: "标签，逗号分隔",
+      negative: "否定 / 排除", write_title: "新建记忆", target_layer: "存入层", layer_hint_knowledge: "长期保留，不随时间衰减", layer_hint_context: "近期情境，会随时间衰减", tags_hint: "标签，逗号分隔",
       entities_hint: "实体，逗号分隔", importance_hint: "重要度 0–1（可空）", set_importance: "手动设置重要度", submit: "写入",
       content_ph: "例如：张总只喝乌龙茶，不喝咖啡。", submit_hint: "Ctrl / ⌘ + Enter 提交",
       written: "已写入：{id}（{action}，层 {layer}）", content_required: "正文不能为空", view_node: "查看节点",
@@ -93,10 +93,10 @@
       tab_exchange: "Import / Export", tab_health: "Health", logout: "Sign out", login_title: "Token required",
       login_hint: "This server requires a Bearer token. It is kept only in this tab's sessionStorage and is cleared when the tab closes.",
       token: "Token", login: "Sign in", bad_token: "Wrong token", loading: "Loading…", refresh: "Refresh",
-      sub_overview: "Size of the memory store, capability tier and loaded components.",
+      sub_overview: "Store size, retrieval mode, layer distribution and loaded components.",
       sub_search: "Hybrid semantic and keyword recall, ranked by relevance.",
       sub_browse: "Page through every memory node by layer and tag. Click a row for details.",
-      sub_write: "Write a new memory. The layer is assigned automatically and duplicates are merged.",
+      sub_write: "Write a new memory. It goes to the Knowledge layer by default; duplicates are detected and merged.",
       sub_exchange: "Export the whole store as a JSON backup, or restore from one.",
       sub_health: "Service status, request volume and auth mode.",
       total_nodes: "Total nodes", db_path: "Database", version: "Version", schema_version: "Schema version",
@@ -111,7 +111,7 @@
       confidence: "Confidence", all_layers: "All", tag_filter: "Filter by tag (exact)", apply: "Apply", prev: "Previous",
       next: "Next", page_info: "{a}–{b} of {n}", empty: "No nodes", empty_hint: "Nothing matches these filters. Head to Write to add the first memory.",
       go_write: "Write a memory", details: "Details", per_page: "Per page",
-      negative: "Negative / excluded", write_title: "Write a memory (perceive)", tags_hint: "Tags, comma separated",
+      negative: "Negative / excluded", write_title: "New memory", target_layer: "Layer", layer_hint_knowledge: "Kept long-term, no decay", layer_hint_context: "Recent context, decays over time", tags_hint: "Tags, comma separated",
       entities_hint: "Entities, comma separated", importance_hint: "Importance 0–1 (optional)", set_importance: "Set importance manually", submit: "Write",
       content_ph: "e.g. Mr. Zhang only drinks oolong tea, never coffee.", submit_hint: "Ctrl / ⌘ + Enter to submit",
       written: "Written: {id} ({action}, layer {layer})", content_required: "Content must not be empty", view_node: "View node",
@@ -498,7 +498,7 @@
       if (st.db) { var ft = dbStat.querySelector(".foot"); if (ft) { ft.title = String(st.db); } }
       var tierStat = stat(t("retrieval_mode"), tier.name, false, "sparkle", tier.sub);
       tierStat.title = String(cap.semantic_tier || "");
-      root.appendChild(h("div", { class: "grid" }, dbStat, stat(t("version"), st.version ? "v" + st.version : "", false, "package", "lingshu-ng"),
+      root.appendChild(h("div", { class: "grid" }, dbStat, stat(t("version"), st.version ? "v" + st.version : "", false, "package", t("plugins") + " " + Object.keys(cap.plugins || {}).length),
         tierStat, stat(t("schema_version"), st.schema_version, false, "hash", t("schema_sub"))));
 
       if (!st.total) {
@@ -759,6 +759,15 @@
     var impOut = h("output", { for: "w-imp", class: "faint", text: "—" });
     var msg = h("div");
     var btn = h("button", { type: "submit", class: "primary" }, icon("check", "sm"), t("submit"));
+    var wLayer = "knowledge";
+    var lhint = h("span", { class: "hint", text: t("layer_hint_knowledge") });
+    var lseg = h("div", { class: "seg", role: "group", "aria-label": t("target_layer") }, ["knowledge", "context"].map(function (l) {
+      return h("button", { type: "button", "data-layer": l, class: l === wLayer ? "on" : "", "aria-pressed": l === wLayer ? "true" : "false", text: layerName(l),
+        onclick: function () {
+          wLayer = l; lhint.textContent = t("layer_hint_" + l);
+          Array.prototype.forEach.call(lseg.children, function (x) { var on = x.getAttribute("data-layer") === l; x.classList.toggle("on", on); x.setAttribute("aria-pressed", on ? "true" : "false"); });
+        } });
+    }));
 
     content.addEventListener("input", function () { counter.textContent = fmtInt(content.value.length) + " / 100000"; });
     function prevChips(input, box, ent) {
@@ -777,6 +786,7 @@
       if (tl.length) { body.tags = tl; }
       if (el.length) { body.entities = el; }
       if (useImp.checked) { body.importance = parseFloat(imp.value); }
+      if (wLayer !== "knowledge") { body.layer = wLayer; }
       btn.disabled = true;
       api("POST", "/v1/perceive", body).then(function (r) {
         msg.appendChild(h("div", { class: "alert ok", role: "status" }, icon("checkCircle"), h("div", { class: "body" },
@@ -791,6 +801,7 @@
       h("div", { class: "cols-2 even" },
         h("div", { class: "field" }, h("label", { for: "w-tags", text: t("tags") }), tags, tagPrev),
         h("div", { class: "field" }, h("label", { for: "w-ents", text: t("entities") }), ents, entPrev)),
+      h("div", { class: "field" }, h("label", { text: t("target_layer") }), h("div", { class: "layer-pick" }, lseg, lhint)),
       h("div", { class: "field" }, h("div", { class: "label-row" }, h("label", { class: "switch", for: "w-imp-on" }, useImp, h("span", { text: t("set_importance") })), impOut),
         h("div", { class: "range-row" }, imp)),
       h("div", { class: "form-foot" }, btn, h("span", { class: "muted" }, h("kbd", { text: "Ctrl" }), "+", h("kbd", { text: "Enter" }))),

@@ -392,6 +392,24 @@ def test_health_endpoint(srv):
     assert _req(port, "GET", "/healthz")[1] == b'{"ok": true}'                   # /healthz 形状不变
 
 
+def test_health_latency_and_responses(srv):
+    """v2.1：/v1/health 带按路由延迟摘要（桶上界估计分位数）与按状态码响应计数，供健康页展示。"""
+    port = srv()
+    _json(port, "GET", "/v1/status")
+    _json(port, "GET", "/v1/nodes/does-not-exist")
+    hl = _json(port, "GET", "/v1/health")[1]
+    st = hl["latency"]["/v1/status"]
+    assert st["count"] >= 1 and 0 < st["p50_ms"] <= st["p95_ms"] and st["avg_ms"] >= 0
+    assert "/v1/nodes/{id}" in hl["latency"]
+    assert hl["responses"].get("200", 0) >= 1 and hl["responses"].get("404", 0) >= 1
+
+
+def test_perceive_context_layer_from_console(srv):
+    port = srv()
+    st, r = _json(port, "POST", "/v1/perceive", {"content": "今天下午三点有临时会议。", "layer": "context"})
+    assert st == 200 and r["layer"] == "context"
+
+
 # ------------------------------------------------------------------ 审计
 def test_audit_log_has_no_content(srv, caplog):
     port = srv()

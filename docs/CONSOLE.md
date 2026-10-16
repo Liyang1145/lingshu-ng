@@ -51,14 +51,14 @@ lingshu-ng console --db ./mem.db --audit-log ./audit.jsonl
 
 | 页 | 内容 | 调用的 API |
 |---|---|---|
-| 概览 | 节点总数、各层计数、库路径、版本、schema 版本、能力档位（`semantic_tier`）、插件列表、依赖、模型 / 引擎 / 退回记录 | `GET /v1/status`、`GET /v1/capabilities` |
+| 概览 | 节点总数、各层计数（中文层名与说明）、库文件、版本、schema 版本、检索模式（`semantic_tier` 映射为“标准检索 / 重排增强 / 向量增强…”，原值见悬停与高级区）、最近写入 5 条、插件列表、依赖；模型 / 引擎 / 退回记录收进“高级”折叠区；空库时显示三步上手引导 | `GET /v1/status`、`GET /v1/capabilities`、`GET /v1/nodes?limit=5` |
 | 检索 | 输入查询和条数；命中展示原文、分数、层、标签、创建时间；点「详情」看节点 | `POST /v1/recall` |
 | 记忆浏览 | 按层 / 标签（精确匹配）筛选，分页（20/50/100/200 条），最新写入在前；列表只显示正文前 300 字 | `GET /v1/nodes` |
 | 节点详情（右侧抽屉） | 全文、标签、实体、重要度、置信度、访问次数、是否受保护 / 可删除、出边和入边（含对端预览，可点开跳转） | `GET /v1/nodes/<id>` |
 | 删除 | 详情抽屉里点「删除节点」，再点「确认删除」（二次确认），节点和它的全部关联边一起删除 | `DELETE /v1/nodes/<id>` |
-| 写入 | perceive 表单：正文、标签、实体（逗号分隔）、重要度 | `POST /v1/perceive` |
+| 写入 | perceive 表单：正文、标签、实体（逗号分隔）、存入层（知识 / 情境，缺省知识）、重要度；结果用人话说明（新建 / 合并到相似记忆 / 重复未改动） | `POST /v1/perceive` |
 | 导入 / 导出 | 导出：整库 JSON 备份，浏览器里下载。导入：选文件后先显示节点数 / 边数摘要，勾选确认后才能导入；导入后显示报告（各表导入数、覆盖数 `overwritten`、`rejected_rows`、`quarantined`、丢弃列、孤儿边、完整性） | `GET /v1/export`、`POST /v1/import` |
-| 健康 | `/healthz`、版本、运行时长、启动时间、请求总数、最近 300 秒请求数、鉴权方式 | `GET /healthz`、`GET /v1/health` |
+| 健康 | `/healthz`、运行时长、启动时间、请求总数、最近 300 秒请求数、并发上限与繁忙拒绝数、鉴权方式；按路由的调用次数与平均 / P50 / P95 延迟（直方图桶上界估计，偏保守）；按状态码的响应计数 | `GET /healthz`、`GET /v1/health` |
 
 ## 3. 安全模型
 
@@ -95,7 +95,7 @@ lingshu-ng console --db ./mem.db --audit-log ./audit.jsonl
 | GET | `/` 、`/console` | 否（受 Host / Origin 约束） | — | 控制台页面（仅 console 模式） |
 | GET | `/console/app.js`、`/console/app.css` | 否（同上） | — | 静态资源（仅 console 模式） |
 | GET | `/healthz` | 否 | — | `{"ok": true}`，形状不变 |
-| GET | `/v1/health` | 是 | — | `{ok, version, started_at, uptime_s, requests_total, requests_recent, recent_window_s, console, auth}` |
+| GET | `/v1/health` | 是 | — | `{ok, version, started_at, uptime_s, requests_total, requests_recent, recent_window_s, console, auth, max_conn, rejected_busy, responses: {状态码: 次数}, latency: {路由: {count, avg_ms, p50_ms, p95_ms}}}` |
 | GET | `/v1/status` | 是 | — | 版本、schema 版本、库路径、各层计数、总数 |
 | GET | `/v1/capabilities` | 是 | — | 生效档位、插件、依赖、模型 |
 | POST | `/v1/perceive` | 是 | console 模式必需 | `{content, tags?, entities?, importance?, confidence?, layer?, skip_dedup?}` → `{node_id, action, layer, reason}` |
