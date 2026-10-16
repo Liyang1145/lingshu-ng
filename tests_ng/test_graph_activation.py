@@ -152,7 +152,9 @@ def test_autodecay_restart_no_stacking_and_survives_errors():
         ad.start(0.05)
         ad.stop()
     ad.start(0.05)
-    time.sleep(0.6)
+    deadline = time.time() + 8
+    while len(calls) <= 2 and time.time() < deadline:
+        time.sleep(0.05)
     alive = [t for t in threading.enumerate() if t not in before and t.is_alive()]
     ad.stop()
     assert len(alive) == 1 and len(ad.errors) == 2 and len(calls) > 2              # #184/core-py-06
