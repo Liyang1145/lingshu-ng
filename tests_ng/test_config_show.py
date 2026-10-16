@@ -15,3 +15,8 @@ def test_cli_config_show(monkeypatch):
         assert cli.main(["config", "--show"]) == 0
     assert "sekret" not in buf.getvalue()
     assert json.loads(buf.getvalue())["env"]["LINGSHU_NG_TOKEN"] == "***"
+
+
+def test_masks_suffix_wildcards():
+    r = show({"LINGSHU_NG_DB_PASSWORD": "p", "LINGSHU_NG_X_SECRET": "s", "LINGSHU_NG_API_KEY": "k", "LINGSHU_NG_EMPTY_KEY": ""})
+    assert r["env"] == {"LINGSHU_NG_DB_PASSWORD": "***", "LINGSHU_NG_X_SECRET": "***", "LINGSHU_NG_API_KEY": "***", "LINGSHU_NG_EMPTY_KEY": ""}
