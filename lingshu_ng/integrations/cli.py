@@ -60,6 +60,8 @@ def _parser() -> argparse.ArgumentParser:
     p.add_argument("snapshot")
     p.add_argument("--force", action="store_true", help="目标库已存在时覆盖（旧库自动另存为 .pre-restore-时间戳）")
     add("doctor", "只读自检（完整性/schema/磁盘/令牌配置/可选件），失败退出码 1")
+    p = add("config", "列出 LINGSHU_NG_* 环境变量及生效值（令牌脱敏）", db=False)
+    p.add_argument("--show", action="store_true", help="显示（缺省行为）")
     add("version", "版本号", db=False)
     return ap
 
@@ -87,6 +89,10 @@ def main(argv: Optional[List[str]] = None) -> int:
             _sv = None
         opt = {m: importlib.util.find_spec(m) is not None for m in ("numpy", "onnxruntime")}
         _print({"version": __version__, "schema": _sv, "python": platform.python_version(), "optional": opt})
+        return 0
+    if a.cmd == "config":
+        from ._configshow import show
+        _print(show())
         return 0
     db = a.db or (":memory:" if a.cmd == "capabilities" else None)
     if not db and a.cmd != "doctor":
