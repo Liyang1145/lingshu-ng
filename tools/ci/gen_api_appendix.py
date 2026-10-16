@@ -75,7 +75,7 @@ def _version_tuple(v):
 
 
 def snapshot():
-    """更新快照。放行规则（STABILITY_ng §3）：有删除 / 改签名 ⇒ 主版本号须升，或当前版本的 CHANGELOG
+    """更新快照。放行规则（STABILITY_ng §3）：有删除 / 改签名 ⇒ 主版本号须升，或 CHANGELOG.md 当前版本小节
     逐个点名（「不兼容变更」）；只有新增 ⇒ 版本号须高于快照，或 CHANGELOG 点名。"""
     import api_surface
     import lingshu_ng
@@ -84,15 +84,18 @@ def snapshot():
     old = json.load(open(SNAPSHOT, encoding="utf-8")) if os.path.exists(SNAPSHOT) else None
     if old is not None:
         d = api_surface.diff(old["surface"], new)
-        mm = ".".join(cur.split(".")[:2])
-        cl = f"CHANGELOG_rel-v{mm}.md"
-        text = open(cl, encoding="utf-8").read() if os.path.exists(cl) else ""
+        cl = "CHANGELOG.md"
+        full = open(cl, encoding="utf-8").read() if os.path.exists(cl) else ""
+        # 只看当前版本小节（「## v<cur>」到下一个「## 」），没有时看「## 未发布」
+        m = re.search(r"(?ms)^## v" + re.escape(cur) + r"\b.*?(?=^## |\Z)", full) or \
+            re.search(r"(?ms)^## 未发布.*?(?=^## |\Z)", full)
+        text = m.group(0) if m else ""
         unnamed = lambda names: [n for n in names if n.rsplit(".", 1)[-1] not in text]
         breaking = d["removed"] + d["changed"]
         if breaking and _version_tuple(cur)[0] <= _version_tuple(old["version"])[0] and unnamed(breaking):
-            sys.exit(f"不兼容变更未放行：{unnamed(breaking)[:20]}——升主版本号，或在 {cl} 逐个点名")
+            sys.exit(f"不兼容变更未放行：{unnamed(breaking)[:20]}——升主版本号，或在 {cl} 当前版本小节逐个点名")
         if d["added"] and _version_tuple(cur) <= _version_tuple(old["version"]) and unnamed(d["added"]):
-            sys.exit(f"新增公开 API 未放行：{unnamed(d['added'])[:20]}——升版本号，或在 {cl} 点名")
+            sys.exit(f"新增公开 API 未放行：{unnamed(d['added'])[:20]}——升版本号，或在 {cl} 当前版本小节点名")
         print("diff", {k: len(v) for k, v in d.items()})
     json.dump({"version": cur, "surface": new}, open(SNAPSHOT, "w", encoding="utf-8"), ensure_ascii=False, indent=0,
               sort_keys=True)

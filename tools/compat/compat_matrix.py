@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """兼容矩阵生成器（stab-r1 #6）：只**读**上游源码的 AST（不导入、不执行、不复制实现），对照 ng 兼容门面的实际签名。
 
-用法：python tools/compat/compat_matrix.py <上游仓根目录> [--json out.json] [--md COMPAT_MATRIX.md]
+用法：python tools/compat/compat_matrix.py <上游仓根目录> [--json out.json] [--md docs/COMPAT_MATRIX.md]
 
 对照面（tests_ng/ng_switch.py 的映射）：
   lingshu.core.core           → lingshu_ng.compat           （SpacetimeMemoryEngine / LayeredStore / 数据类型 / 模块函数）
@@ -247,7 +247,7 @@ def to_markdown(rows, upstream_desc: str, ext=None) -> str:
     s = summary(rows)
     pct = lambda k: f"{s[k]}/{s['total']}（{100.0 * s[k] / s['total']:.1f}%）"
     out = ["# COMPAT_MATRIX · ng 兼容门面 × 上游当前 API", "",
-           f"生成：`python tools/compat/compat_matrix.py <上游仓根> --md COMPAT_MATRIX.md`（只读上游 AST，不导入、不执行、不复制实现）。",
+           f"生成：`python tools/compat/compat_matrix.py <上游仓根> --md docs/COMPAT_MATRIX.md`（只读上游 AST，不导入、不执行、不复制实现）。",
            f"上游：{upstream_desc}。对照面：`lingshu.core.core`（SpacetimeMemoryEngine / LayeredStore / 数据类型 / 模块函数）→ "
            "`lingshu_ng.compat`；`lingshu.core.activation.ActivationEngine` → `lingshu_ng.compat_activation`；"
            "`lingshu.core.longterm_gate.LongTermMemoryGate` → `lingshu_ng.compat_gate`。", "",

@@ -6,7 +6,7 @@
 
 ## 1. 版本号（semver）
 
-`lingshu_ng.__version__` = 发行包 `lingshu-ng` 版本 = `CHANGELOG_rel-vX.Y.md` 的 `X.Y.0`，形如 `主.次.修订`：
+`lingshu_ng.__version__` = 发行包 `lingshu-ng` 版本 = `CHANGELOG.md` 最新的 `## vX.Y.Z` 小节，形如 `主.次.修订`：
 
 | 变化 | 版本号 | 说明 |
 |---|---|---|
@@ -45,7 +45,7 @@
 5. 签名快照只记参数名、种类、缺省值，不记类型注解（注解的字符串形式随 Python 小版本变化）；Python 3.11 / 3.12 / 3.13 下快照相同（多 Python 矩阵跑同一测试）。
 
 截至 rel-v1.30 没有处于弃用期的名字。rel-v1.30 公开名字与签名都不变（快照只改版本号）。rel-v1.29 公开名字不变，只有常量 `lingshu_ng.store.schema.SCHEMA_VERSION` 的值 6 → 7（快照随之更新）。rel-v1.26、rel-v1.27、rel-v1.28 公开名字与签名都不变（快照只改版本号）。rel-v1.25 公开名字不变，只有常量 `lingshu_ng.store.schema.SCHEMA_VERSION` 的值 5 → 6（快照随之更新）。rel-v1.24 拆包没有删除或改签名任何公开名字（快照 469 → 494 项，只有新增 `lingshu_ng.plugins` 的 25 项）；
-发行包层面的不兼容（extras 删除、`capabilities()["dependencies"]` 只列插件声明的依赖）见 CHANGELOG_rel-v1.24「不兼容点」。
+发行包层面的不兼容（extras 删除、`capabilities()["dependencies"]` 只列插件声明的依赖）见 CHANGELOG（v1.24）「不兼容点」。
 
 ## 4. schema 前后兼容矩阵
 
@@ -93,7 +93,7 @@ v2（ng 早期，ec5a2aea，未发布）→ **v3**（4bfafa7b 派生倒排索引
   rel-v1.18–v1.22 设 `LINGSHU_NG_ALLOW_NEWER_SCHEMA=1` 强制打开 v5 库时同样会把标记改写为自己的版本，rel-v1.23 重开后重新迁移、结果同上。以上均属未承诺行为。
   迁移要整体重建派生索引：100k 条零模型库约 1 分 42 秒（2 核 aarch64）。
 - rel-v1.18 起才有「库版本高于代码 ⇒ 拒绝」的检查（`SchemaTooNewError`，逃生口 `LINGSHU_NG_ALLOW_NEWER_SCHEMA=1`）；更早版本不检查。
-  **更正**：CHANGELOG_rel-v1.21 写的「v4 库不能再用 rel-v1.20 及更早版本打开」不准确——只对 rel-v1.18–v1.20 成立，rel-v1.17 及更早不检查、实测能打开读写。
+  **更正**：CHANGELOG（v1.21） 写的「v4 库不能再用 rel-v1.20 及更早版本打开」不准确——只对 rel-v1.18–v1.20 成立，rel-v1.17 及更早不检查、实测能打开读写。
   v4 相对 v3 只多一个触发器（追加式变更），旧代码不走它，所以这几个旧版本读写 v4 库结果正常；但这属于未承诺的行为。
 - **承诺**：新版本总能打开所有旧版本（含上游 cb3a6ea）写出的库并自动迁移（`tests_ng/test_db_safety.py` 用 rel-v1.10 与上游夹具守）；
   旧版本打开新版本的库**不承诺**：rel-v1.18 起会拒绝，降级前请先 `export_all`，用旧版本 `import_all`。
@@ -101,7 +101,7 @@ v2（ng 早期，ec5a2aea，未发布）→ **v3**（4bfafa7b 派生倒排索引
 
 ## 5. 发布检查清单（每次发布）
 
-1. `__version__` 与 `CHANGELOG_rel-vX.Y.md` 同一提交（插件包有改动时一并升插件版本）；`tests_ng/test_api_snapshot.py` 通过（必要时按 §3 更新快照）。
+1. `__version__` 与 `CHANGELOG.md` 的新版本小节同一提交（插件包有改动时一并升插件版本）；`tests_ng/test_api_snapshot.py` 通过（必要时按 §3 更新快照）。
 2. `python tools/ci/gen_api_appendix.py`（API_ng 附录 A）与 `--stability`（本文附录）重新生成，无手改。
 3. schema 有变化：更新 §4 矩阵（重跑最新一轮的 `_stab/r*/schema_matrix.py`，rel-v1.25 为 `_stab/r9/`，rel-v1.26 为 `_stab/r10/`，rel-v1.27 为 `_stab/r11/`，rel-v1.28 为 `_stab/r13/`，rel-v1.29 为 `_stab/r14/`）并加旧库夹具测试。
 

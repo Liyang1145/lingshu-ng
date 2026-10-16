@@ -2,7 +2,7 @@
 """stab-r3 #3：lingshu-ng 发行包定义与版本号一致性。
 
 发行包定义：Liyang/ 发布目录的 ``pyproject.toml``（name = lingshu-ng）；开发树里是 ``release/Liyang/pyproject.toml``。
-版本号唯一来源 ``lingshu_ng.__version__``，须等于最新 ``CHANGELOG_rel-vX.Y.md`` 的 ``X.Y.0``。
+版本号唯一来源 ``lingshu_ng.__version__``，须等于 ``CHANGELOG.md`` 里最新的 ``## vX.Y.Z`` 小节。
 真实安装验收（干净 venv、非 editable、换目录 import + 最小用例）见 tools/ci/pkg_check.sh。
 """
 import ast
@@ -33,11 +33,10 @@ def test_version_single_source_and_changelog():
     assert "version" in pp["project"]["dynamic"] and "version" not in pp["project"]
     assert pp["tool"]["setuptools"]["dynamic"]["version"] == {"attr": "lingshu_ng.__version__"}
     assert re.fullmatch(r"\d+\.\d+\.\d+", lingshu_ng.__version__)
-    logs = [tuple(map(int, m.groups())) for f in ROOT.glob("CHANGELOG_rel-v*.md")
-            if (m := re.fullmatch(r"CHANGELOG_rel-v(\d+)\.(\d+)\.md", f.name))]
-    if logs:                                  # 发布目录 / wt-rel 有 CHANGELOG；最小副本可以没有
-        major, minor = max(logs)
-        assert lingshu_ng.__version__ == f"{major}.{minor}.0"
+    cl = ROOT / "CHANGELOG.md"
+    if cl.exists():                           # 最小副本可以没有 CHANGELOG
+        logs = [tuple(map(int, m)) for m in re.findall(r"(?m)^## v(\d+)\.(\d+)\.(\d+)\b", cl.read_text(encoding="utf-8"))]
+        assert logs and lingshu_ng.__version__ == "%d.%d.%d" % max(logs)
 
 
 KNOWN = {"numpy": "numpy", "PIL": "pillow", "onnxruntime": "onnxruntime", "tokenizers": "tokenizers",

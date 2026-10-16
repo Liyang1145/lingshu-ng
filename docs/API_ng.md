@@ -1,7 +1,7 @@
 # lingshu_ng 对外 API（rel-v1.30）
 
 本文覆盖 `lingshu_ng` 的公开类与方法、参数、返回值、异常、可选依赖与 `capabilities()` 用法。
-版本：`lingshu_ng.__version__ == "1.30.0"`（发行包 `lingshu-ng`，版本号 = `CHANGELOG_rel-v1.30.md`）。
+版本：以 `lingshu_ng.__version__` 为准（发行包 `lingshu-ng`，与 [CHANGELOG.md](../CHANGELOG.md) 最新版本一致）。
 文末附录 A 由代码生成（`tools/ci/gen_api_appendix.py`），列出兼容门面每个公开方法的支持状态，与运行期
 `capabilities.compat_methods()` 一致。
 
@@ -121,7 +121,7 @@ e.close()
 
 `SpacetimeMemoryEngine(db_path=":memory:", identity="协议实例", role=Role.PRIMARY)`，属性 `.ng`（原生引擎）、`.store`（旧 `LayeredStore` 形状的仓储门面）。
 
-- 与上游 `lingshu.core.core`（cb3a6ea）对照：260 个公开方法签名覆盖 260/260，**真实覆盖 215/260**，45 个不支持（逐项见 `COMPAT_MATRIX.md` 与附录 A）。
+- 与上游 `lingshu.core.core`（cb3a6ea）对照：260 个公开方法签名覆盖 260/260，**真实覆盖 215/260**，45 个不支持（逐项见 [COMPAT_MATRIX.md](COMPAT_MATRIX.md) 与附录 A）。
 - 返回形状与旧版一致，例如 `add_perception(...) -> Node`、`recall(context_content, limit=10) -> [(Node, float)]`（原生 `recall` 的 `hits`）。
 - ng 扩展（旧引擎没有）：`capabilities()`、`prefetch_dense()`。
 

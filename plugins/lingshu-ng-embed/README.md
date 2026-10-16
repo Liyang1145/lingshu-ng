@@ -19,7 +19,7 @@ pip install lingshu-ng-embed      # 本插件：numpy、onnxruntime、tokenizers
 | `onnx_embedder` | `lingshu_ng_embed.onnx_embed.OnnxEmbedder` | `from lingshu_ng.embed import OnnxEmbedder`（`LINGSHU_NG_EMBED_MODEL`） |
 | `onnx_cross_encoder` | `lingshu_ng_embed.cross.OnnxCrossEncoder` | `from lingshu_ng.embed.cross import OnnxCrossEncoder`（`LINGSHU_NG_RERANK_MODEL`） |
 
-代码自 lingshu-ng 1.22 原样迁出，读数逐位不变（核心 + 本插件 与 1.22 带模型读数逐题相同，见 `CHANGELOG_rel-v1.24.md`）。
+代码自 lingshu-ng 1.22 原样迁出，读数逐位不变（核心 + 本插件 与 1.22 带模型读数逐题相同，见 CHANGELOG（v1.24））。
 
 ## 模型
 
