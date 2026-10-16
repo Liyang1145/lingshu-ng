@@ -12,6 +12,11 @@ scrape_configs:
     authorization: {credentials_file: /etc/prometheus/lingshu.token}
     static_configs: [{targets: ["127.0.0.1:8765"]}]
 ```
+- 探针（无需鉴权）：`/healthz` 进程存活；`/readyz` 库可开且能拿写锁，否则 503。K8s 示例：
+```yaml
+livenessProbe:  {httpGet: {path: /healthz, port: 8765}, periodSeconds: 10}
+readinessProbe: {httpGet: {path: /readyz,  port: 8765}, periodSeconds: 5, failureThreshold: 3}
+```
 - 日志：`LINGSHU_NG_LOG_FORMAT=json` 便于采集。
 - 一键自检：`lingshu-ng doctor`（JSON 输出，有问题时退出码非零，可挂到定时探活）。
   - 退出码：`0` 全部通过（`ok=true`）；`1` 存在失败项（`ok=false`，见 `checks[].status`）。输出恒为 JSON（含 `ok` 与 `checks`），无需额外 `--json`。

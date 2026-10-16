@@ -5,6 +5,7 @@
 ## 未发布
 
 - `/metrics` 的 `lingshu_ng_info` 增加 `schema` 标签（库结构版本）。
+- OPERATIONS.md 增加 /healthz、/readyz 探针与 K8s 示例。
 
 ## v1.38.0
 
