@@ -8,6 +8,7 @@
     POST /v1/perceive        {"content": "...", 可选 tags/entities/importance/confidence/layer/skip_dedup}
     POST /v1/recall          {"query": "...", "limit": 10}
     GET  /healthz            {"ok": true}（不需鉴权，不碰库）
+    GET  /readyz             {"ready": true}（不需鉴权；库不可写回 503）
     GET  /metrics            Prometheus 文本格式指标（需鉴权；E6-2）
 
 ent-ui 新增（docs/CONSOLE.md）::
@@ -200,7 +201,7 @@ class _Handler(BaseHTTPRequestHandler):
         path = self.path.split("?", 1)[0]
         if _NODE_PATH.match(path):
             return "/v1/nodes/{id}"
-        if path in _GET or path in _POST or path in ("/v1/health", "/metrics", "/healthz"):
+        if path in _GET or path in _POST or path in ("/v1/health", "/metrics", "/healthz", "/readyz"):
             return path
         return "other"          # 固定基数，防标签爆炸
 
@@ -218,6 +219,23 @@ class _Handler(BaseHTTPRequestHandler):
             self._err(403, f"写操作须带请求头 {CONSOLE_HEADER}: 1（CSRF 防护）")
             return False
         return True
+
+    def _ready(self):
+        """/readyz：库文件可开且能拿写锁（BEGIN IMMEDIATE 后回滚，不改数据）。"""
+        import sqlite3
+        path = getattr(self.server.service, "path", ":memory:")
+        if path == ":memory:":
+            return True, ""
+        try:
+            c = sqlite3.connect(path, timeout=1.0)
+            try:
+                c.execute("BEGIN IMMEDIATE")
+                c.rollback()
+            finally:
+                c.close()
+        except Exception as e:
+            return False, type(e).__name__
+        return True, ""
 
     def _health(self) -> None:
         h = getattr(self.server, "_health_info", None)
@@ -395,6 +413,9 @@ class _Handler(BaseHTTPRequestHandler):
         path = self.path.split("?", 1)[0]
         if path == "/healthz":
             return self._send(200, {"ok": True})
+        if path == "/readyz":
+            ok, why = self._ready()
+            return self._send(200 if ok else 503, {"ready": ok} if ok else {"ready": False, "reason": why})
         if getattr(self.server, "console", False) and path in _STATIC:
             if not self._guard():          # 页面本身不含数据，不要求令牌（登录在页面里做），但同样挡外来 Host / Origin
                 return None

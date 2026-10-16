@@ -95,6 +95,7 @@ lingshu-ng console --db ./mem.db --audit-log ./audit.jsonl
 | GET | `/` 、`/console` | 否（受 Host / Origin 约束） | — | 控制台页面（仅 console 模式） |
 | GET | `/console/app.js`、`/console/app.css` | 否（同上） | — | 静态资源（仅 console 模式） |
 | GET | `/healthz` | 否 | — | `{"ok": true}`，形状不变 |
+| GET | `/readyz` | 否 | — | `{"ready": true}`；库不可写回 503 |
 | GET | `/v1/health` | 是 | — | `{ok, version, started_at, uptime_s, requests_total, requests_recent, recent_window_s, console, auth, max_conn, rejected_busy, responses: {状态码: 次数}, latency: {路由: {count, avg_ms, p50_ms, p95_ms}}}` |
 | GET | `/v1/status` | 是 | — | 版本、schema 版本、库路径、各层计数、总数 |
 | GET | `/v1/capabilities` | 是 | — | 生效档位、插件、依赖、模型 |
