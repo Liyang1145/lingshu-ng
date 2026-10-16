@@ -2,7 +2,7 @@
 
 版本号规则与弃用流程见 [docs/STABILITY_ng.md](docs/STABILITY_ng.md)；库结构升级 / 回滚见 [docs/UPGRADE.md](docs/UPGRADE.md)。
 
-## 未发布
+## v1.38.0
 
 - 控制台设计审查：CI 新增 `design-lint` 作业（impeccable 确定性规则扫描六个页面，零发现才过，`tools/design_lint.py`）；靛墨侧栏、层谱品牌标、指标事实带、正文对比度 ≥ 4.5:1、去掉全大写标签 / 中点拼接 / 切页动画；标题层级改为 h1 → h2。
 - 文档精简：研究期报告与预登记移出主分支（存档于 tag v1.37.0），逐版 CHANGELOG 合并为本文件，README 重写。

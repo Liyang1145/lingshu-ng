@@ -233,7 +233,7 @@ class _Handler(BaseHTTPRequestHandler):
                 c.rollback()
             finally:
                 c.close()
-        except Exception as e:
+        except (sqlite3.Error, OSError) as e:
             return False, type(e).__name__
         return True, ""
 
