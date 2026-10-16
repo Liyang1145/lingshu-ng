@@ -2,6 +2,10 @@
 
 版本号规则与弃用流程见 [docs/STABILITY_ng.md](docs/STABILITY_ng.md)；库结构升级 / 回滚见 [docs/UPGRADE.md](docs/UPGRADE.md)。
 
+## 未发布
+
+- `/metrics` 的 `lingshu_ng_info` 增加 `schema` 标签（库结构版本）。
+
 ## v1.38.0
 
 - 控制台设计审查：CI 新增 `design-lint` 作业（impeccable 确定性规则扫描六个页面，零发现才过，`tools/design_lint.py`）；靛墨侧栏、层谱品牌标、指标事实带、正文对比度 ≥ 4.5:1、去掉全大写标签 / 中点拼接 / 切页动画；标题层级改为 h1 → h2。

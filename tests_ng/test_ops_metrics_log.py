@@ -80,7 +80,7 @@ def test_metrics_requires_auth_and_is_prometheus_text(srv):
     assert st == 200 and hd["Content-Type"].startswith("text/plain; version=0.0.4")
     txt = data.decode("utf-8")
     import lingshu_ng
-    assert f'lingshu_ng_info{{version="{lingshu_ng.__version__}"}} 1' in txt
+    assert f'lingshu_ng_info{{version="{lingshu_ng.__version__}",' in txt
     assert re.search(r"^lingshu_ng_uptime_seconds \d+(\.\d+)?$", txt, re.M)
     assert re.search(r'^lingshu_ng_http_responses_total\{code="401"\} [1-9]\d*$', txt, re.M)
     assert re.search(r'^lingshu_ng_http_responses_total\{code="404"\} 1$', txt, re.M)
@@ -115,3 +115,12 @@ def test_latency_histogram_by_route(srv):
     assert "whatever" not in txt
     cum = [int(m) for m in re.findall(r'_bucket\{route="/v1/perceive",le="[^"]+"\} (\d+)', txt)]
     assert cum == sorted(cum)
+
+
+def test_metrics_info_has_schema_label(srv):
+    from lingshu_ng import __version__
+    from lingshu_ng.store.schema import SCHEMA_VERSION
+    port = srv.server_address[1]
+    auth = {"Authorization": "Bearer tok-m"}
+    txt = _req(port, "GET", "/metrics", auth)[2].decode()
+    assert f'lingshu_ng_info{{version="{__version__}",schema="{SCHEMA_VERSION}"}} 1' in txt

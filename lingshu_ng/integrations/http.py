@@ -610,7 +610,9 @@ class Server(ThreadingHTTPServer):
             for labels, v in samples:
                 lab = "{" + ",".join(f'{k}="{_prom_escape(x)}"' for k, x in labels) + "}" if labels else ""
                 out.append(f"{name}{lab} {v}")
-        metric("lingshu_ng_info", "gauge", "Build info.", [((("version", __version__),), 1)])
+        from ..store.schema import SCHEMA_VERSION as _sv
+        metric("lingshu_ng_info", "gauge", "Build info.",
+               [((("version", __version__), ("schema", str(_sv))), 1)])
         metric("lingshu_ng_uptime_seconds", "gauge", "Seconds since server start.",
                [((), round(time.monotonic() - self._t0, 3))])
         metric("lingshu_ng_http_requests_total", "counter", "HTTP requests handled.", [((), total)])
