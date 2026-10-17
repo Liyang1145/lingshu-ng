@@ -2,6 +2,10 @@
 
 版本号规则与弃用流程见 [docs/STABILITY_ng.md](docs/STABILITY_ng.md)；库结构升级 / 回滚见 [docs/UPGRADE.md](docs/UPGRADE.md)。
 
+## 未发布
+
+- OPERATIONS.md 列出全部 /metrics 指标名，并由测试核对与代码一致。
+
 ## v1.39.0
 
 - `/metrics` 的 `lingshu_ng_info` 增加 `schema` 标签（库结构版本）。
