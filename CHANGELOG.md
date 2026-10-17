@@ -3,6 +3,8 @@
 版本号规则与弃用流程见 [docs/STABILITY_ng.md](docs/STABILITY_ng.md)；库结构升级 / 回滚见 [docs/UPGRADE.md](docs/UPGRADE.md)。
 
 ## 未发布
+
+## v1.40.0
 - `config --check`：校验 LINGSHU_NG_* 取值（端口/整数/数值后缀），非法退出码 1。
 
 - OPERATIONS.md 列出全部 /metrics 指标名，并由测试核对与代码一致。
