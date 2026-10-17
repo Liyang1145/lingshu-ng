@@ -36,6 +36,7 @@ readinessProbe: {httpGet: {path: /readyz,  port: 8765}, periodSeconds: 5, failur
 ## 4. 升级与回滚
 - 升级前：`lingshu-ng backup`，再 `pip install -U lingshu-ng`，重启后跑 `lingshu-ng doctor`。
 - 回滚：停服务，`pip install lingshu-ng==<旧版本>`，用升级前的备份 `restore`（新 schema 的库旧版本可能拒绝打开，所以要用备份）。
+- schema 升级：新版本首次打开旧库时自动迁移且不可逆；因此升级前必须备份，并先在备份副本上验证（`restore` 到临时路径后跑 `doctor`）。
 - 发行物校验：Release 对应 CI 产物含 SHA256SUMS 与 SBOM；两次构建在固定 `SOURCE_DATE_EPOCH` 下字节一致（`python tools/release/repro_check.py`）。
 
 ## 5. 故障排查
