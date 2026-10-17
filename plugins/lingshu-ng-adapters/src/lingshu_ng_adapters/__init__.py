@@ -11,7 +11,7 @@
 导入本包不加载任何第三方库；只有导入 ``langchain`` / ``llamaindex`` 子模块时才导入对应库，缺库时抛
 :class:`MissingDependencyError`（``ImportError`` 子类，信息写明 ``pip install`` 什么）。
 """
-__version__ = "1.41.0"
+__version__ = "1.42.0"
 
 from ._optional import MissingDependencyError  # noqa: E402
 
