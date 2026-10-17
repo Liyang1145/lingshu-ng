@@ -57,3 +57,12 @@ readinessProbe: {httpGet: {path: /readyz,  port: 8765}, periodSeconds: 5, failur
 
 - 容量：以 `lingshu_ng_db_size_bytes` 与 `lingshu_ng_memory_nodes` 的比值估算单条平均体积，按增长曲线预留磁盘（含 WAL 与备份副本，至少 3 倍库大小）；`doctor` 会报告磁盘余量。
 - 备份演练（建议每季度）：1) `lingshu-ng backup` 生成备份；2) 在隔离目录 `lingshu-ng restore` 恢复；3) 对恢复库运行 `lingshu-ng doctor`，确认 integrity_check 通过；4) 对比 `lingshu_ng_memory_nodes` 与原库一致；5) 记录耗时作为恢复时间目标（RTO）依据。
+
+## 升级前检查清单与回滚演练
+升级前逐项确认：
+1. `lingshu-ng doctor` 退出码为 0（升级前库本身健康）。
+2. `lingshu-ng config --check` 无告警（库目录可写、令牌文件 0600、TLS 证书/密钥就绪）。
+3. `lingshu-ng backup` 已生成，并已 `restore` 到临时路径、对副本跑过 `doctor`。
+4. 记下当前版本（`pip show lingshu-ng`）与 CHANGELOG 中目标版本的「不兼容 / schema」说明。
+
+回滚演练（建议在预发环境每季度一次）：升级副本 → 写入若干数据 → 停服务 → `pip install lingshu-ng==<旧版本>` → `restore` 升级前备份 → `doctor` 通过 → 抽查关键查询结果与升级前一致。
