@@ -124,3 +124,9 @@ def test_metrics_info_has_schema_label(srv):
     auth = {"Authorization": "Bearer tok-m"}
     txt = _req(port, "GET", "/metrics", auth)[2].decode()
     assert f'lingshu_ng_info{{version="{__version__}",schema="{SCHEMA_VERSION}"}} 1' in txt
+
+
+def test_metrics_db_size(srv):
+    txt = _req(srv.server_address[1], "GET", "/metrics", {"Authorization": "Bearer tok-m"})[2].decode()
+    line = [l for l in txt.splitlines() if l.startswith("lingshu_ng_db_size_bytes ")][0]
+    assert int(line.split()[1]) > 0

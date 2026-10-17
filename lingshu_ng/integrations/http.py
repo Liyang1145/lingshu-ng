@@ -634,6 +634,11 @@ class Server(ThreadingHTTPServer):
         metric("lingshu_ng_memory_nodes_by_layer", "gauge", "Memory nodes by layer.",
                [((("layer", k),), v) for k, v in sorted(st["counts"].items())])
         metric("lingshu_ng_schema_version", "gauge", "Store schema version.", [((), st["schema_version"] or 0)])
+        try:
+            _sz = sum(os.path.getsize(f) for f in (st["db"], st["db"] + "-wal") if os.path.exists(f)) if st.get("db") not in (None, ":memory:") else 0
+        except OSError:
+            _sz = 0
+        metric("lingshu_ng_db_size_bytes", "gauge", "SQLite file size incl. WAL (0 for in-memory).", [((), _sz)])
         return "\n".join(out) + "\n"
 
     def _health_info(self) -> dict:
