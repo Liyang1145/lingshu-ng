@@ -210,7 +210,7 @@ class _Handler(BaseHTTPRequestHandler):
         return "other"          # 固定基数，防标签爆炸
 
     def _tick(self) -> None:
-        self._t_req = time.monotonic()
+        self._t_req = time.perf_counter()
         self._route = self._route_label()
         tick = getattr(self.server, "_count_request", None)
         if tick is not None:
@@ -252,7 +252,7 @@ class _Handler(BaseHTTPRequestHandler):
         t0 = getattr(self, "_t_req", None)
         obs = getattr(self.server, "_observe_latency", None)
         if t0 is not None and obs is not None:
-            obs(self._route, time.monotonic() - t0)
+            obs(self._route, time.perf_counter() - t0)
             self._t_req = None
         super().send_response(code, message)
 
