@@ -27,3 +27,21 @@ def test_config_check():
     assert check({"LINGSHU_NG_HTTP_PORT": "8080", "LINGSHU_NG_X_TIMEOUT": "1.5"})["ok"]
     r = check({"LINGSHU_NG_HTTP_PORT": "99999", "LINGSHU_NG_X_MAX": "abc"})
     assert not r["ok"] and len(r["problems"]) == 2
+
+
+def test_config_check_db_dir_and_token_file_perms(tmp_path):
+    import os, sys
+    from lingshu_ng.integrations._configshow import check
+    r = check({"LINGSHU_NG_DB": str(tmp_path / "no" / "x.db")})
+    assert not r["ok"] and r["problems"][0]["name"] == "LINGSHU_NG_DB"
+    assert check({"LINGSHU_NG_DB": str(tmp_path / "x.db")})["ok"]
+    tf = tmp_path / "tok"
+    tf.write_text("a\n")
+    if sys.platform != "win32":
+        os.chmod(tf, 0o644)
+        r = check({"LINGSHU_NG_TOKEN_FILE": str(tf)})
+        assert not r["ok"] and "0600" in r["problems"][0]["error"]
+        os.chmod(tf, 0o600)
+        assert check({"LINGSHU_NG_TOKEN_FILE": str(tf)})["ok"]
+    r = check({"LINGSHU_NG_TOKEN_FILE": str(tmp_path / "missing")})
+    assert not r["ok"]

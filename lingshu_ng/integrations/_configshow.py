@@ -41,4 +41,15 @@ def check(environ=None) -> dict:
                     raise ValueError
         except ValueError:
             bad.append({"name": k, "value": _mask(k, v), "error": "取值非法"})
+    db = env.get("LINGSHU_NG_DB", "")
+    if db and db != ":memory:":
+        d = os.path.dirname(os.path.abspath(db))
+        if not os.path.isdir(d) or not os.access(d, os.W_OK):
+            bad.append({"name": "LINGSHU_NG_DB", "value": db, "error": "库所在目录不存在或不可写"})
+    tf = env.get("LINGSHU_NG_TOKEN_FILE", "")
+    if tf:
+        if not os.path.isfile(tf):
+            bad.append({"name": "LINGSHU_NG_TOKEN_FILE", "value": "(已设置)", "error": "令牌文件不存在"})
+        elif os.name != "nt" and os.stat(tf).st_mode & 0o077:
+            bad.append({"name": "LINGSHU_NG_TOKEN_FILE", "value": "(已设置)", "error": "权限过宽，应为 0600"})
     return {"ok": not bad, "problems": bad}
