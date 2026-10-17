@@ -20,3 +20,10 @@ def test_cli_config_show(monkeypatch):
 def test_masks_suffix_wildcards():
     r = show({"LINGSHU_NG_DB_PASSWORD": "p", "LINGSHU_NG_X_SECRET": "s", "LINGSHU_NG_API_KEY": "k", "LINGSHU_NG_EMPTY_KEY": ""})
     assert r["env"] == {"LINGSHU_NG_DB_PASSWORD": "***", "LINGSHU_NG_X_SECRET": "***", "LINGSHU_NG_API_KEY": "***", "LINGSHU_NG_EMPTY_KEY": ""}
+
+
+def test_config_check():
+    from lingshu_ng.integrations._configshow import check
+    assert check({"LINGSHU_NG_HTTP_PORT": "8080", "LINGSHU_NG_X_TIMEOUT": "1.5"})["ok"]
+    r = check({"LINGSHU_NG_HTTP_PORT": "99999", "LINGSHU_NG_X_MAX": "abc"})
+    assert not r["ok"] and len(r["problems"]) == 2

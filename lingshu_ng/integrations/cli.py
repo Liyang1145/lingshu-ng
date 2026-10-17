@@ -62,6 +62,7 @@ def _parser() -> argparse.ArgumentParser:
     add("doctor", "只读自检（完整性/schema/磁盘/令牌配置/可选件），失败退出码 1")
     p = add("config", "列出 LINGSHU_NG_* 环境变量及生效值（令牌脱敏）", db=False)
     p.add_argument("--show", action="store_true", help="显示（缺省行为）")
+    p.add_argument("--check", action="store_true", help="校验取值合法性，非法退出码 1")
     add("version", "版本号", db=False)
     return ap
 
@@ -91,7 +92,11 @@ def main(argv: Optional[List[str]] = None) -> int:
         _print({"version": __version__, "schema": _sv, "python": platform.python_version(), "optional": opt})
         return 0
     if a.cmd == "config":
-        from ._configshow import show
+        from ._configshow import check, show
+        if getattr(a, "check", False):
+            r = check()
+            _print(r)
+            return 0 if r["ok"] else 1
         _print(show())
         return 0
     db = a.db or (":memory:" if a.cmd == "capabilities" else None)
