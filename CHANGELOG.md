@@ -3,6 +3,7 @@
 版本号规则与弃用流程见 [docs/STABILITY_ng.md](docs/STABILITY_ng.md)；库结构升级 / 回滚见 [docs/UPGRADE.md](docs/UPGRADE.md)。
 
 ## 未发布
+- `/metrics` 增 `lingshu_ng_audit_events_total`（审计日志行数计数）。
 - `config --check` 增加库目录可写性与令牌文件存在/权限（0600）检查。
 
 ## v1.41.0

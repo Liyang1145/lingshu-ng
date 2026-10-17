@@ -12,7 +12,7 @@ scrape_configs:
     authorization: {credentials_file: /etc/prometheus/lingshu.token}
     static_configs: [{targets: ["127.0.0.1:8765"]}]
 ```
-- 指标名：`lingshu_ng_info`、`lingshu_ng_uptime_seconds`、`lingshu_ng_http_requests_total`、`lingshu_ng_http_responses_total`（按状态码计错误）、`lingshu_ng_http_request_duration_seconds`（直方图，可用 histogram_quantile 求分位）、`lingshu_ng_http_rejected_busy_total`、`lingshu_ng_http_max_connections`、`lingshu_ng_memory_nodes`、`lingshu_ng_memory_nodes_by_layer`、`lingshu_ng_schema_version`、`lingshu_ng_db_size_bytes`（库文件含 WAL 字节数）。
+- 指标名：`lingshu_ng_info`、`lingshu_ng_uptime_seconds`、`lingshu_ng_http_requests_total`、`lingshu_ng_http_responses_total`（按状态码计错误）、`lingshu_ng_http_request_duration_seconds`（直方图，可用 histogram_quantile 求分位）、`lingshu_ng_http_rejected_busy_total`、`lingshu_ng_http_max_connections`、`lingshu_ng_memory_nodes`、`lingshu_ng_memory_nodes_by_layer`、`lingshu_ng_schema_version`、`lingshu_ng_db_size_bytes`（库文件含 WAL 字节数）、`lingshu_ng_audit_events_total`（进程启动以来审计日志行数）。
 - 探针（无需鉴权）：`/healthz` 进程存活；`/readyz` 库可开且能拿写锁，否则 503。K8s 示例：
 ```yaml
 livenessProbe:  {httpGet: {path: /healthz, port: 8765}, periodSeconds: 10}
@@ -52,3 +52,8 @@ readinessProbe: {httpGet: {path: /readyz,  port: 8765}, periodSeconds: 5, failur
 ## 请求体大小上限
 
 `LINGSHU_NG_MAX_BODY`（字节，缺省 1048576，合法范围 1024–268435456，非法值回退缺省）限制普通写请求体，超限回 413；进程启动时读取，改后需重启。`/v1/import` 另有固定上限（32 MiB）。
+
+## 容量规划与备份演练清单
+
+- 容量：以 `lingshu_ng_db_size_bytes` 与 `lingshu_ng_memory_nodes` 的比值估算单条平均体积，按增长曲线预留磁盘（含 WAL 与备份副本，至少 3 倍库大小）；`doctor` 会报告磁盘余量。
+- 备份演练（建议每季度）：1) `lingshu-ng backup` 生成备份；2) 在隔离目录 `lingshu-ng restore` 恢复；3) 对恢复库运行 `lingshu-ng doctor`，确认 integrity_check 通过；4) 对比 `lingshu_ng_memory_nodes` 与原库一致；5) 记录耗时作为恢复时间目标（RTO）依据。

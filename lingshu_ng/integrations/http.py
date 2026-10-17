@@ -112,10 +112,14 @@ def _static_bytes(name: str) -> bytes:
     return resources.files("lingshu_ng.integrations").joinpath("console_static", name).read_bytes()
 
 
+_AUDIT_LINES = [0]
+
+
 def audit(op: str, remote: str, status: int, **fields) -> None:
     """写一行 JSON 审计日志（logger ``lingshu_ng.audit``，INFO）。调用方保证 ``fields`` 不含记忆正文。"""
     rec = {"ts": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "op": op, "remote": remote, "status": status}
     rec.update(fields)
+    _AUDIT_LINES[0] += 1
     _audit.info(json.dumps(rec, ensure_ascii=False, sort_keys=True, default=str))
 
 
@@ -639,6 +643,8 @@ class Server(ThreadingHTTPServer):
         except OSError:
             _sz = 0
         metric("lingshu_ng_db_size_bytes", "gauge", "SQLite file size incl. WAL (0 for in-memory).", [((), _sz)])
+        metric("lingshu_ng_audit_events_total", "counter", "Audit log lines emitted since process start.",
+               [((), _AUDIT_LINES[0])])
         return "\n".join(out) + "\n"
 
     def _health_info(self) -> dict:
