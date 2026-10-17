@@ -4,6 +4,7 @@
 
 ## 未发布
 - `config --check` 增加 TLS 证书/密钥文件存在与密钥 0600 权限检查（`LINGSHU_NG_TLS_CERT_FILE`/`_KEY_FILE`）。
+- `/metrics` 增 `lingshu_ng_http_slow_requests_total{route}`（阈值 `LINGSHU_NG_SLOW_MS`，默认 1000 ms，≤0 关闭）。
 
 ## v1.42.0
 - `/metrics` 增 `lingshu_ng_audit_events_total`（审计日志行数计数）。

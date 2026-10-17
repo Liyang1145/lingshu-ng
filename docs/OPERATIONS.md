@@ -12,7 +12,7 @@ scrape_configs:
     authorization: {credentials_file: /etc/prometheus/lingshu.token}
     static_configs: [{targets: ["127.0.0.1:8765"]}]
 ```
-- 指标名：`lingshu_ng_info`、`lingshu_ng_uptime_seconds`、`lingshu_ng_http_requests_total`、`lingshu_ng_http_responses_total`（按状态码计错误）、`lingshu_ng_http_request_duration_seconds`（直方图，可用 histogram_quantile 求分位）、`lingshu_ng_http_rejected_busy_total`、`lingshu_ng_http_max_connections`、`lingshu_ng_memory_nodes`、`lingshu_ng_memory_nodes_by_layer`、`lingshu_ng_schema_version`、`lingshu_ng_db_size_bytes`（库文件含 WAL 字节数）、`lingshu_ng_audit_events_total`（进程启动以来审计日志行数）。
+- 指标名：`lingshu_ng_info`、`lingshu_ng_uptime_seconds`、`lingshu_ng_http_requests_total`、`lingshu_ng_http_responses_total`（按状态码计错误）、`lingshu_ng_http_request_duration_seconds`（直方图，可用 histogram_quantile 求分位）、`lingshu_ng_http_rejected_busy_total`、`lingshu_ng_http_max_connections`、`lingshu_ng_memory_nodes`、`lingshu_ng_memory_nodes_by_layer`、`lingshu_ng_schema_version`、`lingshu_ng_db_size_bytes`（库文件含 WAL 字节数）、`lingshu_ng_audit_events_total`（进程启动以来审计日志行数）。`lingshu_ng_http_slow_requests_total`（按路由计超过 `LINGSHU_NG_SLOW_MS` 毫秒的请求，默认 1000，≤0 关闭）。
 - 探针（无需鉴权）：`/healthz` 进程存活；`/readyz` 库可开且能拿写锁，否则 503。K8s 示例：
 ```yaml
 livenessProbe:  {httpGet: {path: /healthz, port: 8765}, periodSeconds: 10}

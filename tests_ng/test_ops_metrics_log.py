@@ -130,3 +130,16 @@ def test_metrics_db_size(srv):
     txt = _req(srv.server_address[1], "GET", "/metrics", {"Authorization": "Bearer tok-m"})[2].decode()
     line = [l for l in txt.splitlines() if l.startswith("lingshu_ng_db_size_bytes ")][0]
     assert int(line.split()[1]) > 0
+
+
+def test_slow_requests_counter(srv, monkeypatch):
+    monkeypatch.setenv("LINGSHU_NG_SLOW_MS", "0.000001")
+    port = srv.server_address[1]
+    auth = {"Authorization": "Bearer tok-m"}
+    _req(port, "GET", "/v1/health", auth)
+    txt = _req(port, "GET", "/metrics", auth)[2].decode()
+    assert re.search(r'^lingshu_ng_http_slow_requests_total\{route="[^"]+"\} [1-9]', txt, re.M)
+    monkeypatch.setenv("LINGSHU_NG_SLOW_MS", "0")
+    _req(port, "GET", "/v1/nosuch", auth)
+    txt2 = _req(port, "GET", "/metrics", auth)[2].decode()
+    assert "nosuch" not in "".join(ln for ln in txt2.splitlines() if "slow_requests_total{" in ln)

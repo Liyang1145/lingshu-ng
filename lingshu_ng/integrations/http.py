@@ -518,6 +518,7 @@ class Server(ThreadingHTTPServer):
         self.started_at, self._t0 = time.time(), time.monotonic()
         self.requests_total, self._recent, self._stat_lock = 0, deque(maxlen=100_000), threading.Lock()
         self._lat = {}                   # E8-1：route → [桶累计, 计数, 总和]
+        self._slow = {}                  # E16-2：route → 慢请求数
         self._responses = {}             # E6-2：状态码 → 次数（/metrics）
         super().__init__((host, port), _Handler)
 
@@ -598,6 +599,18 @@ class Server(ThreadingHTTPServer):
                     h[0][i] += 1
             h[1] += 1
             h[2] += secs
+            if secs * 1000.0 >= self._slow_ms():
+                self._slow[route] = self._slow.get(route, 0) + 1
+
+
+    @staticmethod
+    def _slow_ms() -> float:
+        """E16-2：慢请求阈值（毫秒），env LINGSHU_NG_SLOW_MS，默认 1000；非法/≤0 视为关闭。"""
+        try:
+            v = float(os.environ.get("LINGSHU_NG_SLOW_MS", "1000"))
+        except ValueError:
+            v = 1000.0
+        return v if v > 0 else float("inf")
 
     def _metrics_text(self) -> str:
         """E6-2：``GET /metrics`` 正文（Prometheus 文本格式）。"""
@@ -605,6 +618,7 @@ class Server(ThreadingHTTPServer):
         with self._stat_lock:
             total, resp = self.requests_total, dict(self._responses)
             lat = {k: [list(v[0]), v[1], v[2]] for k, v in self._lat.items()}
+            slow = dict(self._slow)
         st = self.service.status()
         out = []
 
@@ -631,6 +645,9 @@ class Server(ThreadingHTTPServer):
             out.append(f'lingshu_ng_http_request_duration_seconds_bucket{{route="{rl}",le="+Inf"}} {n}')
             out.append(f'lingshu_ng_http_request_duration_seconds_sum{{route="{rl}"}} {round(sm, 6)}')
             out.append(f'lingshu_ng_http_request_duration_seconds_count{{route="{rl}"}} {n}')
+        metric("lingshu_ng_http_slow_requests_total", "counter",
+               "Requests slower than LINGSHU_NG_SLOW_MS (default 1000), by route.",
+               [((("route", r),), n) for r, n in sorted(slow.items())])
         metric("lingshu_ng_http_rejected_busy_total", "counter", "Connections rejected with 503 (connection cap).",
                [((), self.rejected_busy)])
         metric("lingshu_ng_http_max_connections", "gauge", "Configured connection cap.", [((), self.max_conn)])
