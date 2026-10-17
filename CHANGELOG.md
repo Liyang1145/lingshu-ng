@@ -2,6 +2,9 @@
 
 版本号规则与弃用流程见 [docs/STABILITY_ng.md](docs/STABILITY_ng.md)；库结构升级 / 回滚见 [docs/UPGRADE.md](docs/UPGRADE.md)。
 
+## 未发布
+- `config --check` 增加 TLS 证书/密钥文件存在与密钥 0600 权限检查（`LINGSHU_NG_TLS_CERT_FILE`/`_KEY_FILE`）。
+
 ## v1.42.0
 - `/metrics` 增 `lingshu_ng_audit_events_total`（审计日志行数计数）。
 - `config --check` 增加库目录可写性与令牌文件存在/权限（0600）检查。

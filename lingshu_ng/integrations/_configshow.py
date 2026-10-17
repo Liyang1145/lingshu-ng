@@ -52,4 +52,12 @@ def check(environ=None) -> dict:
             bad.append({"name": "LINGSHU_NG_TOKEN_FILE", "value": "(已设置)", "error": "令牌文件不存在"})
         elif os.name != "nt" and os.stat(tf).st_mode & 0o077:
             bad.append({"name": "LINGSHU_NG_TOKEN_FILE", "value": "(已设置)", "error": "权限过宽，应为 0600"})
+    for name, strict in (("LINGSHU_NG_TLS_CERT_FILE", False), ("LINGSHU_NG_TLS_KEY_FILE", True)):
+        f = env.get(name, "")
+        if not f:
+            continue
+        if not os.path.isfile(f):
+            bad.append({"name": name, "value": "(已设置)", "error": "文件不存在"})
+        elif strict and os.name != "nt" and os.stat(f).st_mode & 0o077:
+            bad.append({"name": name, "value": "(已设置)", "error": "权限过宽，应为 0600"})
     return {"ok": not bad, "problems": bad}

@@ -45,3 +45,17 @@ def test_config_check_db_dir_and_token_file_perms(tmp_path):
         assert check({"LINGSHU_NG_TOKEN_FILE": str(tf)})["ok"]
     r = check({"LINGSHU_NG_TOKEN_FILE": str(tmp_path / "missing")})
     assert not r["ok"]
+
+
+def test_check_tls_files(tmp_path):
+    import os
+    from lingshu_ng.integrations._configshow import check
+    c = tmp_path / "c.pem"; k = tmp_path / "k.pem"
+    c.write_text("x"); k.write_text("x")
+    os.chmod(k, 0o644)
+    r = check({"LINGSHU_NG_TLS_CERT_FILE": str(c), "LINGSHU_NG_TLS_KEY_FILE": str(k)})
+    if os.name != "nt":
+        assert [p["name"] for p in r["problems"]] == ["LINGSHU_NG_TLS_KEY_FILE"]
+        os.chmod(k, 0o600)
+    assert check({"LINGSHU_NG_TLS_CERT_FILE": str(c), "LINGSHU_NG_TLS_KEY_FILE": str(k)})["ok"]
+    assert not check({"LINGSHU_NG_TLS_CERT_FILE": str(tmp_path / "no")})["ok"]
