@@ -36,6 +36,9 @@ def check(environ=None) -> dict:
             elif k.endswith("_PORT"):
                 if not 1 <= int(v) <= 65535:
                     raise ValueError
+            elif k == "LINGSHU_NG_MAX_BODY":
+                if not 1024 <= int(v) <= (256 << 20):
+                    raise ValueError
             elif k.endswith(_INT_SUFFIX):
                 if int(v) < 0:
                     raise ValueError

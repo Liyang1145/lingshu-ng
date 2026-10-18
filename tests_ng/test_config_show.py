@@ -74,3 +74,11 @@ def test_check_max_conn_must_be_positive():
         r = check({"LINGSHU_NG_MAX_CONN": v})
         assert not r["ok"] and r["problems"][0]["name"] == "LINGSHU_NG_MAX_CONN", v
     assert check({"LINGSHU_NG_MAX_CONN": "64"})["ok"]
+
+
+def test_check_max_body_range():
+    from lingshu_ng.integrations._configshow import check
+    for v in ("10", "abc", str((256 << 20) + 1)):
+        r = check({"LINGSHU_NG_MAX_BODY": v})
+        assert not r["ok"] and r["problems"][0]["name"] == "LINGSHU_NG_MAX_BODY", v
+    assert check({"LINGSHU_NG_MAX_BODY": "1048576"})["ok"]
