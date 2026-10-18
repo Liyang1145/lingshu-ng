@@ -3,6 +3,8 @@
 版本号规则与弃用流程见 [docs/STABILITY_ng.md](docs/STABILITY_ng.md)；库结构升级 / 回滚见 [docs/UPGRADE.md](docs/UPGRADE.md)。
 
 ## 未发布
+- 文档：OPERATIONS.md 增加「限流与容量调优」一节。
+
 
 - `config --check`：`LINGSHU_NG_MAX_CONN` 必须为正整数（0/负数/非整数报错，此前 0 被静默改为 1）。
 

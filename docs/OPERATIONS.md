@@ -85,3 +85,10 @@ groups:
     expr: histogram_quantile(0.95, sum by (le) (rate(lingshu_ng_http_request_duration_seconds_bucket[5m]))) > 1
     for: 10m
 ```
+
+## 限流与容量调优
+
+- 并发上限：`LINGSHU_NG_MAX_CONN`（缺省 64）；满时直接回 503 + `Retry-After: 1`，不新开线程。`lingshu-ng config --check` 会校验取值。
+- 调优依据：`lingshu_ng_http_rejected_busy_total` 持续增长且 p95 时延（`http_request_duration_seconds`）仍低 → 调大上限；时延同步恶化 → 受 CPU/磁盘限制，应横向拆库或在上游限流，而非继续加大。
+- 慢请求：`LINGSHU_NG_SLOW_MS` 设阈值，观察 `http_slow_requests_total`。
+- 请求体上限见上节；调整后用 `doctor` 复查。
