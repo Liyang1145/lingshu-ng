@@ -59,3 +59,10 @@ def test_check_tls_files(tmp_path):
         os.chmod(k, 0o600)
     assert check({"LINGSHU_NG_TLS_CERT_FILE": str(c), "LINGSHU_NG_TLS_KEY_FILE": str(k)})["ok"]
     assert not check({"LINGSHU_NG_TLS_CERT_FILE": str(tmp_path / "no")})["ok"]
+
+
+def test_config_check_slow_ms():
+    from lingshu_ng.integrations._configshow import check
+    assert check({"LINGSHU_NG_SLOW_MS": "250"})["ok"]
+    assert not check({"LINGSHU_NG_SLOW_MS": "abc"})["ok"]
+    assert not check({"LINGSHU_NG_SLOW_MS": "-1"})["ok"]

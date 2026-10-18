@@ -19,7 +19,7 @@ def show(environ=None) -> dict:
 
 
 _INT_SUFFIX = ("_PORT", "_MAX", "_LIMIT", "_TOPN", "_CONCURRENCY", "_BYTES")
-_NUM_SUFFIX = ("_TIMEOUT", "_SECONDS", "_TTL", "_RATE")
+_NUM_SUFFIX = ("_MS", "_TIMEOUT", "_SECONDS", "_TTL", "_RATE")
 
 
 def check(environ=None) -> dict:

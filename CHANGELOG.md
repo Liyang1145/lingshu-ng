@@ -2,6 +2,9 @@
 
 版本号规则与弃用流程见 [docs/STABILITY_ng.md](docs/STABILITY_ng.md)；库结构升级 / 回滚见 [docs/UPGRADE.md](docs/UPGRADE.md)。
 
+## 未发布
+- `config --check` 校验 `LINGSHU_NG_SLOW_MS`（*_MS 后缀须为非负数）。
+
 ## v1.43.0
 - OPERATIONS.md 增加升级前检查清单与回滚演练。
 - `config --check` 增加 TLS 证书/密钥文件存在与密钥 0600 权限检查（`LINGSHU_NG_TLS_CERT_FILE`/`_KEY_FILE`）。
