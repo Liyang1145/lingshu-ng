@@ -2,6 +2,10 @@
 
 版本号规则与弃用流程见 [docs/STABILITY_ng.md](docs/STABILITY_ng.md)；库结构升级 / 回滚见 [docs/UPGRADE.md](docs/UPGRADE.md)。
 
+## 未发布
+
+- `config --check`：`LINGSHU_NG_MAX_CONN` 必须为正整数（0/负数/非整数报错，此前 0 被静默改为 1）。
+
 ## v0.1.0
 
 版本号自本版起重置为 0.1.0（项目尚处早期，此前的 1.x 编号属内部迭代，不代表稳定版承诺）。0.1.0 包含下列内部编号 1.0–1.44 的全部功能，代码与 1.44.0 相同。旧的 v1.31.0–v1.44.0 tag 与 GitHub Release 已删除。

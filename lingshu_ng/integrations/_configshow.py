@@ -30,7 +30,10 @@ def check(environ=None) -> dict:
         if not k.startswith("LINGSHU_NG_") or v == "":
             continue
         try:
-            if k.endswith("_PORT"):
+            if k == "LINGSHU_NG_MAX_CONN":
+                if int(v) < 1:
+                    raise ValueError
+            elif k.endswith("_PORT"):
                 if not 1 <= int(v) <= 65535:
                     raise ValueError
             elif k.endswith(_INT_SUFFIX):

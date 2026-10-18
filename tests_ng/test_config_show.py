@@ -66,3 +66,11 @@ def test_config_check_slow_ms():
     assert check({"LINGSHU_NG_SLOW_MS": "250"})["ok"]
     assert not check({"LINGSHU_NG_SLOW_MS": "abc"})["ok"]
     assert not check({"LINGSHU_NG_SLOW_MS": "-1"})["ok"]
+
+
+def test_check_max_conn_must_be_positive():
+    from lingshu_ng.integrations._configshow import check
+    for v in ("0", "-1", "abc", "1.5"):
+        r = check({"LINGSHU_NG_MAX_CONN": v})
+        assert not r["ok"] and r["problems"][0]["name"] == "LINGSHU_NG_MAX_CONN", v
+    assert check({"LINGSHU_NG_MAX_CONN": "64"})["ok"]
