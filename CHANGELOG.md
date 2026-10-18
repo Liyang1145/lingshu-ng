@@ -2,60 +2,66 @@
 
 版本号规则与弃用流程见 [docs/STABILITY_ng.md](docs/STABILITY_ng.md)；库结构升级 / 回滚见 [docs/UPGRADE.md](docs/UPGRADE.md)。
 
-## v1.44.0
+## v0.1.0
+
+版本号自本版起重置为 0.1.0（项目尚处早期，此前的 1.x 编号属内部迭代，不代表稳定版承诺）。0.1.0 包含下列内部编号 1.0–1.44 的全部功能，代码与 1.44.0 相同。旧的 v1.31.0–v1.44.0 tag 与 Release 仍保留在 GitHub 上，仅作历史记录。
+
+## 历史（内部编号，已废弃）
+
+### 内部编号 1.44.0
 
 - docs: OPERATIONS.md 增加 Prometheus 告警规则示例（含指标名核对测试）
 - `config --check` 校验 `LINGSHU_NG_SLOW_MS`（*_MS 后缀须为非负数）。
 
-## v1.43.0
+### 内部编号 1.43.0
 - OPERATIONS.md 增加升级前检查清单与回滚演练。
 - `config --check` 增加 TLS 证书/密钥文件存在与密钥 0600 权限检查（`LINGSHU_NG_TLS_CERT_FILE`/`_KEY_FILE`）。
 - `/metrics` 增 `lingshu_ng_http_slow_requests_total{route}`（阈值 `LINGSHU_NG_SLOW_MS`，默认 1000 ms，≤0 关闭）。
 
-## v1.42.0
+### 内部编号 1.42.0
 - `/metrics` 增 `lingshu_ng_audit_events_total`（审计日志行数计数）。
 - `config --check` 增加库目录可写性与令牌文件存在/权限（0600）检查。
 
-## v1.41.0
+### 内部编号 1.41.0
 - `/metrics` 增 `lingshu_ng_db_size_bytes`。
 
-## v1.40.0
+### 内部编号 1.40.0
 - `config --check`：校验 LINGSHU_NG_* 取值（端口/整数/数值后缀），非法退出码 1。
 
 - OPERATIONS.md 列出全部 /metrics 指标名，并由测试核对与代码一致。
 
-## v1.39.0
+### 内部编号 1.39.0
 
 - `/metrics` 的 `lingshu_ng_info` 增加 `schema` 标签（库结构版本）。
 - OPERATIONS.md 增加 /healthz、/readyz 探针与 K8s 示例。
 
-## v1.38.0
+### 内部编号 1.38.0
 
 - 控制台设计审查：CI 新增 `design-lint` 作业（impeccable 确定性规则扫描六个页面，零发现才过，`tools/design_lint.py`）；靛墨侧栏、层谱品牌标、指标事实带、正文对比度 ≥ 4.5:1、去掉全大写标签 / 中点拼接 / 切页动画；标题层级改为 h1 → h2。
 - 文档精简：研究期报告与预登记移出主分支（存档于 tag v1.37.0），逐版 CHANGELOG 合并为本文件，README 重写。
 - 新增 `lingshu-ng config --show`：列出全部 LINGSHU_NG_* 环境变量及生效值，令牌/密钥脱敏。
 - 新增 `GET /readyz`：免鉴权就绪探针，库不可写回 503（`/healthz` 不变）。
 
-## v1.37.0
+### 内部编号 1.37.0
 
 - Web 控制台 v2.1：层名本地化、检索模式人话化、最近写入与空库引导、相关度百分比、写入可选层、移动端与深色对比度修复。
 - /v1/health 增加 latency/responses 指标；健康页按路由展示延迟与状态码。
 - 文档：doctor 退出码文档化并加测试。
 
-## v1.36.0
+### 内部编号 1.36.0
 
 - Web 控制台 v2：设计令牌与深浅色主题、侧栏布局、hash 路由、骨架屏/空状态。
 - 检索结果卡片高亮、右侧抽屉详情、拖放导入、健康自动刷新、键盘快捷键、移动端适配。
 - console-e2e 增加 v2 用例。
 
-## v1.35.0
+### 内部编号 1.35.0
 
 - 新增 `docs/UPGRADE.md`：schema 版本与升级/回滚矩阵（测试校验与代码一致）。
 - CLI `lingshu-ng version --json`：版本、schema、python、可选件。
 - 请求体大小上限可配置：`LINGSHU_NG_MAX_BODY`，已文档化。
 - 控制台：插件表状态列不再折行；插件版本与核心对齐。
 
-## v1.34.0
+### 内部编号 1.34.0
 
 - `/metrics` 增请求时延直方图（按路由，固定桶）。
 - 新增 `lingshu-ng doctor`：库 integrity_check、schema 版本、磁盘余量、令牌/绑定配置风险、可选件状态；JSON 输出，有故障退出码非零。
@@ -63,27 +69,27 @@
 - 新增 `docs/OPERATIONS.md` 运维手册（监控、备份 cron、令牌轮换、升级/回滚、故障排查）；`docs/ADOPTION.md` 选型说明。
 - 修复 doctor 能力探测的静默宽 except（改记日志）。
 
-## v1.33.0 — 可运维与供应链
+### 内部编号 1.33.0 — 可运维与供应链
 
-### 可运维
+#### 可运维
 - E6-2 结构化日志：`LINGSHU_NG_LOG_FORMAT=json` 时每行一个 JSON（`ts` UTC 毫秒 / `level` / `logger` / `msg`，异常带 `exc`），缺省 `text`；值非法时 CLI / 控制台启动即报错（退出码 2），不静默退回。
 - E6-2 `GET /metrics`：Prometheus 文本格式 0.0.4，**与其他接口同样需要 Bearer 令牌**。指标：`lingshu_ng_info{version}`、`lingshu_ng_uptime_seconds`、`lingshu_ng_http_requests_total`、`lingshu_ng_http_responses_total{code}`、`lingshu_ng_http_rejected_busy_total`、`lingshu_ng_http_max_connections`、`lingshu_ng_memory_nodes`、`lingshu_ng_memory_nodes_by_layer{layer}`、`lingshu_ng_schema_version`。只含计数，不含记忆正文；`POST /metrics` 回 405。
 - E6-3 `lingshu-ng backup` / `lingshu-ng restore`：SQLite 在线备份 API 物理快照（服务运行中可做），快照跑 `integrity_check` 并写 `*.manifest.json`（版本、行数、SHA-256）；恢复前校验快照、表结构与清单校验和，旧库另存为 `*.pre-restore-<时间戳>` 后原子替换；两个命令都写审计日志（`remote=cli`）。
 
-### 供应链
+#### 供应链
 - E6-1 `tools/release/sbom.py`：生成 CycloneDX 1.5 JSON SBOM（核心包 + 5 个插件包 + 插件声明的第三方依赖，依赖版本以区间记录；同一源码与时间戳下输出确定）。核心包依赖为空。
 - E6-1 `tools/release/checksums.py`：SHA256SUMS 生成 / 校验（与 `sha256sum -c` 同格式）与 Release 说明用的 Markdown 表。
 - CI 新增 `release-artifacts` 作业：每次构建 wheel / sdist + SBOM + SHA256SUMS，自校验后作为 CI 产物上传，校验和表写入作业摘要。
 
-### 未修 / 未承诺
+#### 未修 / 未承诺
 - `/metrics` 无请求时延直方图；多进程部署时各进程计数独立。
 - SBOM 只列声明的依赖区间，不含安装环境实际解析版本与传递依赖（需要时用 `pip-audit` / `cyclonedx-py` 对安装环境另行生成）。
 - 物理快照不可跨 schema 降级恢复；跨版本迁移仍用 `/v1/export` / `/v1/import`。
 - 无 TLS / 多租户 / RBAC（交给反向代理）。
 
-## v1.32.0 — 运维加固
+### 内部编号 1.32.0 — 运维加固
 
-### 运维与安全
+#### 运维与安全
 - E5-1 HTTP 并发连接上限：`LINGSHU_NG_MAX_CONN`（缺省 64），满则立即回 503 + `Retry-After: 1`，不再无限开线程；`/v1/health` 增 `max_conn`、`rejected_busy`。
 - E5-3 令牌免重启轮换：`LINGSHU_NG_TOKEN_FILE`（每行一个有效令牌，`#` 注释），按 mtime 自动重读，新旧令牌可并存过渡；文件读出空集时拒绝所有请求（失败关闭）；文件启动时不可读则拒绝启动。可与 `--token` 同时使用。
 - 新增公开 API：`lingshu_ng.integrations.http.Server.valid_tokens`（只增不改）。
@@ -91,19 +97,19 @@
 - E5-4 审计覆盖 MCP 与 CLI：`lingshu_perceive`（含失败）与 `lingshu-ng perceive` 也写 `lingshu_ng.audit`，`remote` 字段为 `mcp` / `cli`，同样不含正文。
 - E5-5 控制台真实浏览器端到端：`tests_e2e/`（Playwright + Chromium，未装则跳过）覆盖 CSP 下无脚本错误、写入、检索、浏览、详情、二次确认删除、XSS 负载只作文本、令牌登录（只进 sessionStorage）、中英切换、导出下载；CI 新增 `console-e2e` 作业。
 
-### 未修 / 未承诺
+#### 未修 / 未承诺
 - 无 TLS / 多租户 / RBAC（交给反向代理）；控制台端到端只测 Chromium。
 - 令牌文件轮换按 mtime 判定：同一秒内改两次且文件系统 mtime 粒度粗时，可能要等下一次修改才生效。
 
-## v1.31.0 — 企业版首发
+### 内部编号 1.31.0 — 企业版首发
 
 独立仓库 https://github.com/Liyang1145/lingshu-ng 的第一个正式版本。主题：安全、兼容、可运维、可管理。检索算法与读数与 1.30 相同（不开调优轮，只作回归门）。
 
-### 安全（sec-r1 + sec-r2，报告 docs/security/SECURITY_REPORT_sec-r1.md）
+#### 安全（sec-r1 + sec-r2，报告 docs/security/SECURITY_REPORT_sec-r1.md）
 - sec-r1 12 项：HTTP 回环 Host 白名单（DNS 重绑定）、无令牌拒非本机 Origin（跨站写入）、读超时 30 s、积压 128、拒 Transfer-Encoding、深嵌套 JSON 400；MCP 深嵌套 / 超长行 / 空批量 / 非法工具名；导入逐值类型校验与 rejected_rows；三处四次方正则改占有量词；新建库 0600；Pillow 下沿 12.3。
 - sec-r2（遗留项）：O2 导入覆盖已有节点计入 `overwritten`；O3 标签 / 实体单次 ≤1000 项、单项 ≤1024 字符；O5 可选 LLM 抽取只许 https 或本机 http，缓存 0600；O8 `Authorization` 方案名大小写不敏感。
 
-### 本机 Web 控制台（ent-ui，新增，无不兼容变更）
+#### 本机 Web 控制台（ent-ui，新增，无不兼容变更）
 
 - 新子命令 `lingshu-ng console --db PATH [--host 127.0.0.1] [--port 8766] [--token T] [--audit-log FILE]`，以及 `python -m lingshu_ng.integrations.console`。文档 `docs/CONSOLE.md`。
 - 新增公开 API（只增不改）：`Service.list_nodes`、`Service.get_node`、`Service.delete_node`、`Service.export_backup`、`Service.import_backup`。`Server.__init__` / `make_server` 签名不变。
@@ -112,25 +118,25 @@
 - `NodeRepo.page`（内部）：分页 + 层 / 标签过滤。
 - 测试：`tests_ng/test_console.py`（31 例）。
 
-### 兼容对接
+#### 兼容对接
 - 新插件 `plugins/lingshu-ng-adapters`：mem0 `Memory`/`AsyncMemory` 兼容 API、LangChain ChatHistory/Retriever/VectorStore、LlamaIndex Retriever/Memory/MemoryBlock、官方 MCP memory server 9 个工具名。CI `adapters` 作业装真实 langchain-core / llama-index-core 跑标准套件。
 
-### 部署与运维
+#### 部署与运维
 - `Dockerfile`：python:3.12-slim、非 root（uid 10001）、`/data` 卷、HEALTHCHECK；CI `docker` 作业做冒烟（带令牌起服务、401、非 root、无令牌拒绝启动）。
 - `docs/ENTERPRISE.md`：交付形态、支持矩阵、安全基线、部署、运维、已知限制。
 
-### 质量
+#### 质量
 - CI 全矩阵 Linux / Windows / macOS × Python 3.11–3.13：修复 Windows 跨盘符 relpath、USERPROFILE、schema v7 迁移用例分数时间漂移（id 与排序仍逐项相等）。
 - 插件测试分目录运行（同名 conftest 冲突）。
 - 修复：Windows 3.11/3.12 粗时钟（约 15.6 ms）下同刻写入的多条近重复，去重合并目标取「同刻组里最旧」而非最新（排序次键 id 改倒序）；新增粗时钟回归用例。
 
-### 未修 / 未承诺（如实列出）
+#### 未修 / 未承诺（如实列出）
 - HTTP 每连接一线程、并发连接无硬上限；导出整库进内存、无流式；令牌无过期 / 轮换；无 TLS / 多租户 / RBAC（交给反向代理）。
 - 审计只覆盖 HTTP 通道（MCP / CLI 写入不记）。
 - 插件即代码的信任模型、模型目录同用户可替换、依赖未锁定哈希、若干三次方正则——见安全报告第 3 节。
 - 控制台端到端只在 Chromium 上测（未测 Firefox / Safari）。
 
-## v1.0 – v1.30（研究期，2026-10-12 至 10-15）
+### 内部编号 1.0 – 1.30（研究期，2026-10-12 至 10-15）
 
 这一阶段在合作仓 LingShu-prime 的 `Liyang/` 目录内迭代，以 `rel-vX.Y` 命名。逐版的完整说明、读数与未胜项存档于 tag `v1.37.0` 的 `docs/changelog/`。下表只保留每版主题；**带「升级须知」的版本改了库结构或安装方式**。
 
