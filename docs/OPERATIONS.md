@@ -66,3 +66,22 @@ readinessProbe: {httpGet: {path: /readyz,  port: 8765}, periodSeconds: 5, failur
 4. 记下当前版本（`pip show lingshu-ng`）与 CHANGELOG 中目标版本的「不兼容 / schema」说明。
 
 回滚演练（建议在预发环境每季度一次）：升级副本 → 写入若干数据 → 停服务 → `pip install lingshu-ng==<旧版本>` → `restore` 升级前备份 → `doctor` 通过 → 抽查关键查询结果与升级前一致。
+
+## Prometheus 告警规则示例
+
+```yaml
+groups:
+- name: lingshu-ng
+  rules:
+  - alert: LingshuNgDown
+    expr: up{job="lingshu-ng"} == 0
+    for: 2m
+  - alert: LingshuNgBusy
+    expr: increase(lingshu_ng_http_rejected_busy_total[5m]) > 0
+    for: 5m
+  - alert: LingshuNgSlowRequests
+    expr: increase(lingshu_ng_http_slow_requests_total[10m]) > 10
+  - alert: LingshuNgP95Latency
+    expr: histogram_quantile(0.95, sum by (le) (rate(lingshu_ng_http_request_duration_seconds_bucket[5m]))) > 1
+    for: 10m
+```

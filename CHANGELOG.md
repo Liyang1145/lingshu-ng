@@ -2,7 +2,9 @@
 
 版本号规则与弃用流程见 [docs/STABILITY_ng.md](docs/STABILITY_ng.md)；库结构升级 / 回滚见 [docs/UPGRADE.md](docs/UPGRADE.md)。
 
-## 未发布
+## v1.44.0
+
+- docs: OPERATIONS.md 增加 Prometheus 告警规则示例（含指标名核对测试）
 - `config --check` 校验 `LINGSHU_NG_SLOW_MS`（*_MS 后缀须为非负数）。
 
 ## v1.43.0
