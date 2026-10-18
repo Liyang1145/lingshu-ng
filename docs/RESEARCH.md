@@ -1,6 +1,6 @@
 # 研究期测评摘要
 
-lingshu-ng 在成为企业向项目之前（2026-10-09 至 10-15，版本 v1.0–v1.30），经历了一段以检索质量为主的研究迭代。本页只保留结论；完整报告、预登记、逐题读数和测评脚本的说明存档于 tag [`v1.37.0`](https://github.com/Liyang1145/lingshu-ng/tree/v1.37.0)（根目录 `REPORT_*.md`、`PREREG_*.md`，以及 `bench_*/`、`evalsuite*/` 下的报告）。测评脚本本身仍在主分支的 `bench_*/`、`evalsuite*/` 目录里。
+lingshu-ng 在成为企业向项目之前（2026-10-09 至 10-15，版本 v1.0–v1.30），经历了一段以检索质量为主的研究迭代。本页只保留结论；完整报告、预登记、逐题读数和测评脚本的说明存档于提交 [`00152d6`](https://github.com/Liyang1145/lingshu-ng/tree/00152d66b44007ecf8ff17203786db8a48cee222)（根目录 `REPORT_*.md`、`PREREG_*.md`，以及 `bench_*/`、`evalsuite*/` 下的报告）。测评脚本本身仍在主分支的 `bench_*/`、`evalsuite*/` 目录里。
 
 自 v1.16 起，检索、版本链与中文指标只作回归门（每次改动须逐题持平），不再开调优轮。
 
