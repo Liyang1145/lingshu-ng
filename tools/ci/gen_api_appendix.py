@@ -86,10 +86,10 @@ def snapshot():
         d = api_surface.diff(old["surface"], new)
         cl = "CHANGELOG.md"
         full = open(cl, encoding="utf-8").read() if os.path.exists(cl) else ""
-        # 只看当前版本小节（「## v<cur>」到下一个「## 」），没有时看「## 未发布」
-        m = re.search(r"(?ms)^## v" + re.escape(cur) + r"\b.*?(?=^## |\Z)", full) or \
-            re.search(r"(?ms)^## 未发布.*?(?=^## |\Z)", full)
-        text = m.group(0) if m else ""
+        # 只看当前版本小节（「## v<cur>」到下一个「## 」）与「## 未发布」
+        text = "".join(m.group(0) for m in (
+            re.search(r"(?ms)^## v" + re.escape(cur) + r"\b.*?(?=^## |\Z)", full),
+            re.search(r"(?ms)^## 未发布.*?(?=^## |\Z)", full)) if m)
         unnamed = lambda names: [n for n in names if n.rsplit(".", 1)[-1] not in text]
         breaking = d["removed"] + d["changed"]
         if breaking and _version_tuple(cur)[0] <= _version_tuple(old["version"])[0] and unnamed(breaking):
