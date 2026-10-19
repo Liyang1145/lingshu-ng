@@ -82,3 +82,10 @@ def test_check_max_body_range():
         r = check({"LINGSHU_NG_MAX_BODY": v})
         assert not r["ok"] and r["problems"][0]["name"] == "LINGSHU_NG_MAX_BODY", v
     assert check({"LINGSHU_NG_MAX_BODY": "1048576"})["ok"]
+
+
+def test_check_log_format():
+    from lingshu_ng.integrations._configshow import check
+    assert check({"LINGSHU_NG_LOG_FORMAT": "JSON"})["ok"]
+    r = check({"LINGSHU_NG_LOG_FORMAT": "xml"})
+    assert not r["ok"] and r["problems"][0]["name"] == "LINGSHU_NG_LOG_FORMAT"

@@ -33,6 +33,9 @@ def check(environ=None) -> dict:
             if k == "LINGSHU_NG_MAX_CONN":
                 if int(v) < 1:
                     raise ValueError
+            elif k == "LINGSHU_NG_LOG_FORMAT":
+                if v.strip().lower() not in ("text", "json"):
+                    raise ValueError
             elif k.endswith("_PORT"):
                 if not 1 <= int(v) <= 65535:
                     raise ValueError
