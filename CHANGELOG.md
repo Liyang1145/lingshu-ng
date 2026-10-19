@@ -3,6 +3,7 @@
 版本号规则与弃用流程见 [docs/STABILITY_ng.md](docs/STABILITY_ng.md)；库结构升级 / 回滚见 [docs/UPGRADE.md](docs/UPGRADE.md)。
 
 ## 未发布
+- 测试：文档化的每个 LINGSHU_NG_* 环境变量须在 config --check 校验清单或显式豁免清单中（防新增变量漏校验）。
 - 文档：OPERATIONS.md 增加「限流与容量调优」一节。
 - `config --check`：`LINGSHU_NG_MAX_BODY` 须在 1024..256MiB（服务端越界值会静默回退缺省，现在检查时报出）。
 - `config --check`：`LINGSHU_NG_LOG_FORMAT` 只能是 text/json（服务启动本就会拒绝，现在检查时提前报出）。
