@@ -6,6 +6,7 @@
 - 文档：OPERATIONS.md 增加「限流与容量调优」一节。
 - `config --check`：`LINGSHU_NG_MAX_BODY` 须在 1024..256MiB（服务端越界值会静默回退缺省，现在检查时报出）。
 - `config --check`：`LINGSHU_NG_LOG_FORMAT` 只能是 text/json（服务启动本就会拒绝，现在检查时提前报出）。
+- `config --check`：`LINGSHU_NG_STRICT_UNSUPPORTED` 须为 0/1/true/false/yes/no/on/off。
 
 
 - `config --check`：`LINGSHU_NG_MAX_CONN` 必须为正整数（0/负数/非整数报错，此前 0 被静默改为 1）。

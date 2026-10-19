@@ -89,3 +89,10 @@ def test_check_log_format():
     assert check({"LINGSHU_NG_LOG_FORMAT": "JSON"})["ok"]
     r = check({"LINGSHU_NG_LOG_FORMAT": "xml"})
     assert not r["ok"] and r["problems"][0]["name"] == "LINGSHU_NG_LOG_FORMAT"
+
+
+def test_check_strict_unsupported_bool():
+    from lingshu_ng.integrations._configshow import check
+    assert check({"LINGSHU_NG_STRICT_UNSUPPORTED": "1"})["ok"]
+    r = check({"LINGSHU_NG_STRICT_UNSUPPORTED": "maybe"})
+    assert not r["ok"] and r["problems"][0]["name"] == "LINGSHU_NG_STRICT_UNSUPPORTED"

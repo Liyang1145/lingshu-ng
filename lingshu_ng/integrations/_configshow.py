@@ -36,6 +36,9 @@ def check(environ=None) -> dict:
             elif k == "LINGSHU_NG_LOG_FORMAT":
                 if v.strip().lower() not in ("text", "json"):
                     raise ValueError
+            elif k == "LINGSHU_NG_STRICT_UNSUPPORTED":
+                if v.strip().lower() not in ("0", "1", "true", "false", "yes", "no", "on", "off"):
+                    raise ValueError
             elif k.endswith("_PORT"):
                 if not 1 <= int(v) <= 65535:
                     raise ValueError
