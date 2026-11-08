@@ -4,6 +4,7 @@
 
 ## 未发布
 
+- 对照上游 6f701ab：compat tag_node 校验 tag 为非空字符串（list/空串/None 抛 TypeError），不再把 list 字符串化污染标签。
 - 对照上游 7931505：register_conflict 拒绝自冲突（a==b 抛 ValueError），不再给节点打永久 conflict 标签。
 - 对照上游 7a39011：gen 插件 pick_prompts(n<=0) 返回空集（原先静默返回 1 条）。
 - 对照上游 8e0a12d/67a2c0f：add_perception 的 tags/entities 非 str 项与空串、modality 非 str/空串改为入参即报错（None 项跳过）；export_all/export_trajectory 落盘前剥除 BiDi 控制与零宽字符。

@@ -121,6 +121,8 @@ class LayeredStore:
 
     def tag_node(self, node_id: str, tag: str) -> None:
         """旧 API ``tag_node``：形状适配，规则委托 ng 组件。"""
+        if not isinstance(tag, str) or not tag.strip():
+            raise TypeError("tag 必须是非空字符串")
         self.ng.nodes.add_tags(node_id, [tag])
 
     def query_nodes(self, layer: Optional[MemoryLayer] = None, modality: Optional[str] = None,
