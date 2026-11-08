@@ -306,6 +306,8 @@ class Retriever:
         q = (query or "").strip()
         if not q:
             return []
+        if limit is None or (isinstance(limit, int) and not isinstance(limit, bool) and limit < 0):
+            limit = 1 << 30   # None / 负数 = 全量（对照上游 b36fa67）
         top = self._ranked(q, layers, int(limit))
         nodes = self.store.nodes.get_many([t[0] for t in top])
         out = [(nodes[nid], s) for nid, s in top if nid in nodes]
