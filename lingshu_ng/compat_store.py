@@ -356,6 +356,8 @@ class LayeredStore:
     def register_conflict(self, a_id: str, b_id: str,
                           condition_space: Optional[ConditionSpace] = None) -> Optional[Edge]:
         """旧 API ``register_conflict``：形状适配，规则委托 ng 组件。"""
+        if a_id == b_id:
+            raise ValueError(f"节点不能与自身冲突: {a_id}")
         if self.ng.nodes.get(a_id) is None or self.ng.nodes.get(b_id) is None:
             return None
         import uuid

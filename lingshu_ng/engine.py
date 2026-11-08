@@ -379,6 +379,8 @@ class MemoryEngine:
 
     def register_conflict(self, a_id: str, b_id: str) -> Optional[Edge]:
         """矛盾登记：OPPOSITE 边（不参与自然衰减）+ 两端 conflict 标签，同一事务。"""
+        if a_id == b_id:
+            raise ValueError(f"节点不能与自身冲突: {a_id}")
         with self.store.db.tx():
             if self.store.nodes.get(a_id) is None or self.store.nodes.get(b_id) is None:
                 return None
