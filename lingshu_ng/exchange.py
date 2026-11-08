@@ -16,6 +16,7 @@
 from __future__ import annotations
 
 import json
+import re
 import math
 from typing import Dict, List, Optional, Sequence, Tuple
 
@@ -68,6 +69,20 @@ def _with_keys(rows: List[Dict]) -> List[Dict]:
     return rows
 
 
+_EXPORT_CTRL = re.compile("[\u200e\u200f\u202a-\u202e\u2066-\u2069\u200b-\u200d\u2060\ufeff]")
+
+
+def strip_export_controls(o):
+    """对照上游 67a2c0f（#802）：导出树深剥 BiDi 控制/零宽字符（RTLO 视觉欺骗，CWE-176）；只动导出面。"""
+    if isinstance(o, str):
+        return _EXPORT_CTRL.sub("", o)
+    if isinstance(o, dict):
+        return {(_EXPORT_CTRL.sub("", k) if isinstance(k, str) else k): strip_export_controls(v) for k, v in o.items()}
+    if isinstance(o, list):
+        return [strip_export_controls(v) for v in o]
+    return o
+
+
 def export_all(store: Store, output_path: str) -> Dict:
     """X1/X5：导出实际存在的 M13 表到 JSON。"""
     have = store.db.tables()
@@ -80,7 +95,7 @@ def export_all(store: Store, output_path: str) -> Dict:
         if t in have:
             data[t] = [r for r in _rows(store, t) if not _internal_meta(t, r)]
     with open(output_path, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2, allow_nan=False)
+        json.dump(strip_export_controls(data), f, ensure_ascii=False, indent=2, allow_nan=False)
     return {"exported_nodes": len(data.get("nodes", [])), "path": output_path,
             "tables": len(data) - 1, "skipped_tables": skipped, "not_exported_tables": derived}
 

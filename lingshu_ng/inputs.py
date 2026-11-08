@@ -96,7 +96,12 @@ def str_list(x: Any, name: str) -> Optional[List[str]]:
         raise TypeError(f"{name} 应为字符串列表（收到 {type(x).__name__}）") from None
     if len(items) > MAX_LIST_ITEMS:
         raise ValueError(f"{name} 最多 {MAX_LIST_ITEMS} 项（收到 {len(items)}；lingshu_ng.inputs.MAX_LIST_ITEMS，未写入任何内容）")
+    items = [t for t in items if t is not None]       # 对照上游 8e0a12d：None 项跳过
     for i, t in enumerate(items):
+        if not isinstance(t, str):
+            raise TypeError(f"{name}[{i}] 应为字符串（收到 {type(t).__name__}）——不做静默字符串化（未写入任何内容）")
+        if t == "":
+            raise ValueError(f"{name}[{i}] 为空字符串（未写入任何内容）")
         if isinstance(t, str) and len(t) > MAX_ITEM_CHARS:
             raise ValueError(f"{name}[{i}] 长 {len(t)} 字符，超过 {MAX_ITEM_CHARS}（未写入任何内容）")
         if isinstance(t, str) and _surrogate_at(t) >= 0:

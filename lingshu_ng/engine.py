@@ -234,6 +234,10 @@ class MemoryEngine:
         """写一条记忆（默认知识层，M5 去重）。命中去重 ⇒ action=merged。
         入参先判后写（:mod:`lingshu_ng.inputs`）：非 str 正文 ⇒ TypeError，孤立代理码位 ⇒ ValueError。"""
         content = inputs.content(content)
+        if not isinstance(modality, str):
+            raise TypeError(f"modality 应为字符串（收到 {type(modality).__name__}）")   # 对照上游 8e0a12d
+        if not modality:
+            raise ValueError("modality 不得为空字符串")
         tags, entities = inputs.str_list(tags, "tags"), inputs.str_list(entities, "entities")
         imp, layer = unit(importance, "importance"), MemoryLayer.coerce(layer)
         conf = unit(confidence, "confidence")

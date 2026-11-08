@@ -95,7 +95,7 @@ class BodyMixin:
                                  "condition_space": "轨迹导出 · 训练资产格式（有损投影）"})
         if output_path:
             with open(output_path, "w", encoding="utf-8") as f:
-                json.dump(traj, f, ensure_ascii=False, indent=2)
+                json.dump(__import__('lingshu_ng.exchange',fromlist=['x']).strip_export_controls(traj), f, ensure_ascii=False, indent=2)
         return traj
 
     def export_structured_trajectories(self, limit: int = 10, output_path: Optional[str] = None) -> Dict[str, Any]:

@@ -3,6 +3,8 @@
 版本号规则与弃用流程见 [docs/STABILITY_ng.md](docs/STABILITY_ng.md)；库结构升级 / 回滚见 [docs/UPGRADE.md](docs/UPGRADE.md)。
 
 ## 未发布
+
+- 对照上游 8e0a12d/67a2c0f：add_perception 的 tags/entities 非 str 项与空串、modality 非 str/空串改为入参即报错（None 项跳过）；export_all/export_trajectory 落盘前剥除 BiDi 控制与零宽字符。
 - 测试：文档化的每个 LINGSHU_NG_* 环境变量须在 config --check 校验清单或显式豁免清单中（防新增变量漏校验）。
 - 文档：OPERATIONS.md 增加「限流与容量调优」一节。
 - `config --check`：`LINGSHU_NG_MAX_BODY` 须在 1024..256MiB（服务端越界值会静默回退缺省，现在检查时报出）。
