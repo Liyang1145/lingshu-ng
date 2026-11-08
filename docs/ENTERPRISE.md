@@ -27,7 +27,7 @@
 - 请求体上限 1 MiB、读超时 30 s、listen 积压 128、拒绝 `Transfer-Encoding`、深嵌套 JSON 回 400。
 - 令牌常数时间比较；可用 `LINGSHU_NG_TOKEN_FILE`（每行一个令牌）免重启轮换：先加新令牌并存，客户端切换后删旧令牌即吊销；文件读出空集时拒绝所有请求（失败关闭）。
 - 并发连接上限 `LINGSHU_NG_MAX_CONN`（缺省 64），满则立即回 503 + `Retry-After: 1`，`/v1/health` 报 `rejected_busy`。
-- 不做 TLS——对外暴露必须放在反向代理（TLS + 访问控制）之后。
+- 不做 TLS——对外暴露必须放在反向代理（TLS + 访问控制）之后。 `LINGSHU_NG_TLS_CERT_FILE` / `_KEY_FILE` 仅被 `config --check` 校验（文件存在、密钥 0600），服务本身不读取它们做 TLS。
 - 新建库文件权限 0600；导入按 schema 类型逐值校验，坏行拒收并计入报告，覆盖已有节点计入 `overwritten`。
 - 标签 / 实体单次最多 1000 项、单项 ≤1024 字符；查询截断 4096 字符；limit ≤100000。
 - 可选 LLM 抽取默认关闭；开启后只允许 https（或本机 http）端点。
