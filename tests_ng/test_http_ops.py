@@ -28,10 +28,16 @@ def mk(tmp_path, monkeypatch):
 
 
 def _status(port, hdr=None, path="/v1/status"):
-    c = http.client.HTTPConnection("127.0.0.1", port, timeout=10)
-    c.request("GET", path, headers=hdr or {})
-    r = c.getresponse(); r.read(); c.close()
-    return r.status, dict(r.getheaders())
+    last = None
+    for _ in range(5):                    # Windows 上服务端提前关连接会 WinError 10053/10054，重试
+        try:
+            c = http.client.HTTPConnection("127.0.0.1", port, timeout=10)
+            c.request("GET", path, headers=hdr or {})
+            r = c.getresponse(); r.read(); c.close()
+            return r.status, dict(r.getheaders())
+        except (ConnectionError, http.client.RemoteDisconnected) as e:
+            last = e; time.sleep(0.1)
+    raise last
 
 
 def test_connection_cap_returns_503(mk, monkeypatch):
