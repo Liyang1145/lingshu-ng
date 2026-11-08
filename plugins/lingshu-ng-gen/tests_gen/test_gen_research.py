@@ -132,3 +132,9 @@ def test_align_probe_distance_and_hits():
     assert A.own_distribution([], [0], [1], [1]) is None
     pairs = [("stripe", "square"), ("triangle", "diamond"), ("circle", "circle")]
     assert A.cross_source_hits(pairs)["hit"] == 2 and A.cross_source_hits(pairs, False)["hit"] == 1
+
+
+def test_pick_prompts_nonpositive_n_returns_empty():
+    lib = [{"name": "vs_s1", "tags": {"prompt": "flat vector illustration, one red circle(s) in the center"}}]
+    assert M.pick_prompts(lib, 0) == []
+    assert M.pick_prompts(lib, -3) == []

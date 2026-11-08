@@ -62,6 +62,8 @@ def pick_prompts(lib: Iterable[Dict], n: int) -> List[Dict]:
     """确定性子集：``vs_s*`` 记录中 prompt 可被受控模板解析者，按 name 升序、prompt 去重取前 n 条。
 
     判据是“能通过受控模板解析”而非“名字排序靠前”（旧 R293 首跑选中风景域 ``ls_*`` 的事故）。"""
+    if n <= 0:
+        return []
     seen, out = set(), []
     for r in sorted(lib, key=lambda x: x["name"]):
         p = (r.get("tags") or {}).get("prompt")

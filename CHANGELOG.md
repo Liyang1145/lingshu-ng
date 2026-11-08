@@ -4,6 +4,7 @@
 
 ## 未发布
 
+- 对照上游 7a39011：gen 插件 pick_prompts(n<=0) 返回空集（原先静默返回 1 条）。
 - 对照上游 8e0a12d/67a2c0f：add_perception 的 tags/entities 非 str 项与空串、modality 非 str/空串改为入参即报错（None 项跳过）；export_all/export_trajectory 落盘前剥除 BiDi 控制与零宽字符。
 - 测试：文档化的每个 LINGSHU_NG_* 环境变量须在 config --check 校验清单或显式豁免清单中（防新增变量漏校验）。
 - 文档：OPERATIONS.md 增加「限流与容量调优」一节。
