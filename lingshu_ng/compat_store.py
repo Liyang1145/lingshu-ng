@@ -8,6 +8,7 @@ compat 与 compat_engine 都单向依赖本模块；``lingshu_ng.compat.LayeredS
 """
 from __future__ import annotations
 
+import math
 import itertools
 import logging
 from typing import Dict, List, Optional, Sequence, Tuple
@@ -243,6 +244,13 @@ class LayeredStore:
         ``now``（上游 #176 同名同义）：``None`` ⇒ 每次调用 = 一个周期（旧步进语义，行为不变）；给出墙钟时刻 ⇒
         按 ``dt = now − 上次衰减时刻`` 换算等效遗忘比例（每 60 s 一个 ``factor``，见 :func:`lingshu_ng.decay.elapsed_factor`），
         「相同 Δt 下调用 1 次与 60 次结果相同」。首次进入时间模式按一个周期计；时钟回拨 dt 记 0。上次时刻存 engine_meta。"""
+        try:
+            _mc = float(min_confidence)
+        except (TypeError, ValueError) as exc:
+            raise TypeError("min_confidence 必须是实数，收到 %r" % (min_confidence,)) from exc
+        if not math.isfinite(_mc) or not (0.0 <= _mc <= 1.0):
+            raise ValueError("min_confidence 必须是 [0, 1] 内的有限值，收到 %r" % (min_confidence,))
+        min_confidence = _mc
         if now is not None:
             factor = elapsed_factor(factor, self._decay_dt(now), DECAY_PERIOD_SECONDS)
         self._mnt.step(factor, min_confidence)
@@ -286,6 +294,10 @@ class LayeredStore:
     def add_blindspot(self, code: str, description: str, severity: str = "medium",
                       category: str = "operational", predictability: str = "pending_assessment") -> str:
         """旧 API ``add_blindspot``：形状适配，规则委托 ng 组件。"""
+        if not isinstance(code, str) or not code.strip():
+            raise ValueError("add_blindspot 需要非空 code，收到 %r" % (code,))
+        if not isinstance(description, str) or not description.strip():
+            raise ValueError("add_blindspot 需要非空 description，收到 %r" % (description,))
         return self.ng.registry.add_blindspot(code, description, severity, category, predictability)
 
     def list_blindspots(self, status: Optional[str] = None) -> List[Dict]:
@@ -349,6 +361,8 @@ class LayeredStore:
 
     def protect_node(self, node_id: str, reason: str) -> None:
         """旧 API ``protect_node``：形状适配，规则委托 ng 组件。"""
+        if not isinstance(reason, str) or not reason.strip():
+            raise ValueError("protect_node 需要非空理由，收到 %r" % (reason,))
         self.ng.registry.protect(node_id, reason)
 
     def get_protected_nodes(self) -> List[str]:
@@ -434,6 +448,8 @@ class LayeredStore:
 
     def insight_verify(self, insight_id: str, level: str = "V2", evidence: object = None) -> Dict:
         """旧 API ``insight_verify``：形状适配，规则委托 ng 组件。"""
+        if level is not None and not isinstance(level, str):
+            raise TypeError("insight_verify 的 level 必须是字符串或 None，收到 %s" % type(level).__name__)
         return self._ins.verify(insight_id, level, evidence)
 
     def insight_report(self, window: Optional[int] = None) -> Dict:

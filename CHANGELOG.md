@@ -3,6 +3,7 @@
 版本号规则与弃用流程见 [docs/STABILITY_ng.md](docs/STABILITY_ng.md)；库结构升级 / 回滚见 [docs/UPGRADE.md](docs/UPGRADE.md)。
 
 ## 未发布
+- 修复：decay_cycle 阈值值域、add_blindspot/protect_node 空标识/空理由、insight_verify level 类型 fail-loud（对照上游 d56ab2b）。
 
 - 修复：insight_record/insight_window 对非字符串内容、非映射条件 fail-loud（对照上游 e6724bc / 533de41）。
 - induce_concepts：新成员并入既有概念而非另起重复概念（对照上游 d08ae59）
