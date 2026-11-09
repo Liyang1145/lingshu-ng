@@ -3,6 +3,7 @@
 版本号规则与弃用流程见 [docs/STABILITY_ng.md](docs/STABILITY_ng.md)；库结构升级 / 回滚见 [docs/UPGRADE.md](docs/UPGRADE.md)。
 
 ## 未发布
+- induce_concepts：新成员并入既有概念而非另起重复概念（对照上游 d08ae59）
 
 - 文档：SECURITY.md 与稳定性策略改为 0.1.0 口径；ENTERPRISE.md 说明 TLS 变量只由 config --check 校验
 - 修复：search_content 的 limit=None/负数 = 全量（此前 None 抛 TypeError、-1 返回空）（对照上游 b36fa67）

@@ -154,11 +154,21 @@ def promote_context_memories(self, limit: int = 30) -> list:
 
 
 # ------------------------------------------------------------------ 归纳
+def _find_concept_host(self, members: list):
+    """成员已挂靠的既有归纳概念（无则 None）。"""
+    for m in members:
+        for e in self.store.get_incoming_edges(m.id):
+            src = self.store.get_node(e.source_id)
+            if src is not None and {"concept", "induced"} <= set(src.tags):
+                return src
+    return None
+
+
 def induce_concepts(self, min_cluster_size: int = 3, similarity_threshold: float = 0.6,
                     max_concepts: int = 5, condition_space: Any = None) -> List[Node]:
     """单链聚类归纳概念（全知识层；无时间预算截断——倒排只用于候选对生成，不丢高频二元组）。"""
     prot = set(self.ng.store.registry.protected_ids())
-    skip = {"induced", "concept", "cluster_member", "no_forget"}
+    skip = {"induced", "concept", "no_forget"}
     nodes = [n for n in self.ng.store.nodes.scan([MemoryLayer.KNOWLEDGE])
              if n.id not in prot and not skip & set(n.tags)]
     if len(nodes) < min_cluster_size:
@@ -184,7 +194,25 @@ def induce_concepts(self, min_cluster_size: int = 3, similarity_threshold: float
     for i, n in enumerate(nodes):
         groups.setdefault(find(i), []).append(n)
     out = []
-    for cluster in [g for g in groups.values() if len(g) >= min_cluster_size][:max_concepts]:
+    done = 0
+    for cluster in [g for g in groups.values() if len(g) >= min_cluster_size]:
+        if done >= max_concepts:
+            break
+        old = [m for m in cluster if "cluster_member" in m.tags]
+        new = [m for m in cluster if "cluster_member" not in m.tags]
+        if not new:
+            continue
+        host = _find_concept_host(self, old)
+        if host is not None:
+            for m in new:
+                self.ng.link(host.id, m.id, EdgeType.SIMILAR, 0.6, evidence="inferred")
+                self.ng.store.nodes.add_tags(m.id, ["cluster_member"])
+            done += 1
+            continue
+        cluster = new
+        if len(cluster) < min_cluster_size:
+            continue
+        done += 1
         rep = max(cluster, key=lambda n: (n.importance or 0.0, n.id))
         c = self.add_perception(f"[概念] 由 {len(cluster)} 条记忆归纳（代表：{rep.content[:40]}…）",
                                 importance=0.75, tags=["concept", "induced", "pending_verification"],
