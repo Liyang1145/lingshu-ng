@@ -366,6 +366,8 @@ class MemoryEngine:
              confidence: float = 0.5, condition_space: Optional[ConditionSpace] = None,
              evidence: str = "extracted") -> Edge:
         """建边（守卫与端点存在性在仓储内保证）。"""
+        if condition_space is not None and not isinstance(condition_space, ConditionSpace):
+            raise TypeError(f"condition_space 必须是 ConditionSpace 或 None（收到 {type(condition_space).__name__}）")
         e = Edge(id=_uid("edge"), source_id=source_id, target_id=target_id,
                  relation_type=EdgeType.coerce(relation),
                  condition_space=condition_space or ConditionSpace.default("关系建立", "语义分析"),
@@ -379,6 +381,9 @@ class MemoryEngine:
 
     def register_conflict(self, a_id: str, b_id: str) -> Optional[Edge]:
         """矛盾登记：OPPOSITE 边（不参与自然衰减）+ 两端 conflict 标签，同一事务。"""
+        for _n, _v in (("a_id", a_id), ("b_id", b_id)):
+            if not isinstance(_v, str):
+                raise TypeError(f"{_n}（node id）必须是 str（收到 {type(_v).__name__}）")
         if a_id == b_id:
             raise ValueError(f"节点不能与自身冲突: {a_id}")
         with self.store.db.tx():
