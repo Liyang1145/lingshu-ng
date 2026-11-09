@@ -50,6 +50,34 @@ EDGE_BASE_DECAY: Dict[str, float] = {
     "spatial_connected": 0.50, "opposite": 0.80,
 }
 INHIBITORY = frozenset({"opposite"})
+DEFAULT_CONFIDENCE = 0.3          # 旧库缺 confidence 列/值时的兜底（对照上游 64e9020）
+
+
+def _clamp_conf(c: Any) -> float:
+    try:
+        c = float(c)
+    except (TypeError, ValueError):
+        return DEFAULT_CONFIDENCE
+    if c != c:
+        return DEFAULT_CONFIDENCE
+    return min(1.0, max(0.0, c))
+
+
+def _expand(arcs: Sequence[Tuple]) -> List[Tuple[str, str, float, bool]]:
+    """边 → (src, dst, 衰减, 抑制)。抑制边按 confidence 缩放（3 元组边视为满置信）并双向。"""
+    res: List[Tuple[str, str, float, bool]] = []
+    for arc in arcs:
+        s, t, rel = arc[0], arc[1], arc[2]
+        d = EDGE_BASE_DECAY.get(rel, DEFAULT_DECAY)
+        if rel in INHIBITORY:
+            if len(arc) > 3:
+                d = d * _clamp_conf(arc[3])
+            res.append((s, t, d, True))
+            if s != t:
+                res.append((t, s, d, True))
+        else:
+            res.append((s, t, d, False))
+    return res
 DEFAULT_DECAY = 0.5
 SELF_CONDITION_WEIGHT = 0.5
 
@@ -134,8 +162,8 @@ class ActivationEngine:
         texts = {}
         for nid, content, tags, ok in self.port.all(f"SELECT id, content, tags, ({cond}) FROM nodes", params):
             texts[nid] = (normalize((content or "") + " " + _tag_text(tags)), bool(ok))
-        arcs = [(r[0], r[1], r[2]) for r in self.port.all(
-            "SELECT source_id, target_id, relation_type FROM edges ORDER BY rowid")]
+        arcs = [(r[0], r[1], r[2], r[3]) for r in self.port.all(
+            "SELECT source_id, target_id, relation_type, confidence FROM edges ORDER BY rowid")]
         return texts, arcs
 
     @staticmethod
@@ -165,14 +193,15 @@ class ActivationEngine:
         "activated_count", "max_act"}``（重构路径全程留痕，旧 activation.py 的 steps）。
         """
         neg: Dict[str, float] = {}
+        expanded = _expand(arcs)
         for hop in range(1, hops + 1):
             nxt_pos, nxt_neg = dict(pos), dict(neg)
-            for s, t, rel in arcs:
+            for s, t, d, inhib in expanded:
                 a = pos.get(s, 0.0)
                 if a <= 0:
                     continue
-                v = a * EDGE_BASE_DECAY.get(rel, DEFAULT_DECAY)
-                bucket = nxt_neg if rel in INHIBITORY else nxt_pos
+                v = a * d
+                bucket = nxt_neg if inhib else nxt_pos
                 if v > bucket.get(t, 0.0):
                     bucket[t] = v
             for nid in set(nxt_pos) | set(nxt_neg):
@@ -399,8 +428,8 @@ class _GraphView:
     def _out(arcs: Sequence[Tuple[str, str, str]]) -> Dict[str, List[Tuple[str, float, bool]]]:
         """出边邻接：src → [(dst, 衰减系数, 是否抑制)]（插入序）。"""
         out: Dict[str, List[Tuple[str, float, bool]]] = {}
-        for s, t, rel in arcs:
-            out.setdefault(s, []).append((t, EDGE_BASE_DECAY.get(rel, DEFAULT_DECAY), rel in INHIBITORY))
+        for s, t, d, inhib in _expand(arcs):
+            out.setdefault(s, []).append((t, d, inhib))
         return out
 
     @classmethod
@@ -413,7 +442,7 @@ class _GraphView:
             cur = port.conn.cursor()
             cur.row_factory = None
             known, seed, fresh = cls._scan_nodes(cur, prev)
-            arcs = cur.execute("SELECT source_id, target_id, relation_type FROM edges ORDER BY rowid").fetchall()
+            arcs = cur.execute("SELECT source_id, target_id, relation_type, confidence FROM edges ORDER BY rowid").fetchall()
         v = cls.__new__(cls)
         v.fp, v.known, v.arcs_sig = fp, known, hash(tuple(arcs))
         v.out = prev.out if prev is not None and prev.arcs_sig == v.arcs_sig else cls._out(arcs)

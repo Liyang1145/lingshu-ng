@@ -118,7 +118,7 @@ def test_opposite_edges_inhibit(tmp_path):
     claim = e.perceive("旧结论：方案甲最优").node_id
     for i in range(3):
         ev = e.perceive(f"证据{i}：方案甲在场景{i}失败").node_id
-        e.link(ev, claim, EdgeType.OPPOSITE)
+        e.link(ev, claim, EdgeType.OPPOSITE, confidence=1.0)
     act = ActivationEngine(audit_path=str(tmp_path / "a.jsonl"), store=e.store)
     r = act.activate("方案甲失败的证据", workset="w", hops=1)
     assert claim not in [m[0] for m in r["top"]]                                    # #229
