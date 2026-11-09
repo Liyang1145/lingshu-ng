@@ -3,6 +3,8 @@
 版本号规则与弃用流程见 [docs/STABILITY_ng.md](docs/STABILITY_ng.md)；库结构升级 / 回滚见 [docs/UPGRADE.md](docs/UPGRADE.md)。
 
 ## 未发布
+
+- 修复：insight_record/insight_window 对非字符串内容、非映射条件 fail-loud（对照上游 e6724bc / 533de41）。
 - induce_concepts：新成员并入既有概念而非另起重复概念（对照上游 d08ae59）
 
 - 文档：SECURITY.md 与稳定性策略改为 0.1.0 口径；ENTERPRISE.md 说明 TLS 变量只由 config --check 校验

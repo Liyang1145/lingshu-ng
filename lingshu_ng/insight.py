@@ -61,6 +61,10 @@ class Insights:
     def record(self, content: str, conditions: Optional[Dict] = None, source: str = "",
                importance: float = 0.7) -> Dict:
         """记录洞见事件（pending）。显式提供的条件置信 0.7，默认值 0.3。"""
+        if not isinstance(content, str) or not content.strip():
+            raise ValueError("content 必须是非空字符串")
+        if conditions is not None and not isinstance(conditions, dict):
+            raise ValueError("conditions 必须是映射或 None")
         vals = dict(DEFAULT_CONDITIONS)
         given = {k for k in (conditions or {}) if k in vals}
         vals.update({k: conditions[k] for k in given})
@@ -156,6 +160,8 @@ class Insights:
     @staticmethod
     def window(conditions: Optional[Dict] = None) -> Dict:
         """当前洞察窗口（默认假设 C1≥0.6 ∧ 跨域 ∧ 低压力，未经统计确认）。"""
+        if conditions is not None and not isinstance(conditions, dict):
+            raise ValueError("conditions 必须是映射或 None")
         c = conditions or {}
         c1, c3, c5 = c.get("memory_retrievability"), c.get("cross_domain"), c.get("pressure")
         ok = ((c1 is None or c1 >= 0.6) and (c3 is None or (isinstance(c3, list) and len(c3) > 0))
