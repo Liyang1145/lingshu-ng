@@ -377,6 +377,9 @@ class MemoryEngine:
 
     def protect(self, node_id: str, reason: str) -> bool:
         """不可遗忘保护（共享层需 PRIMARY）。"""
+        for _n, _v in (("node_id", node_id), ("reason", reason)):
+            if not isinstance(_v, str):
+                raise TypeError(f"protect: {_n} 须为 str，收到 {type(_v).__name__}")
         return self.store.registry.protect(node_id, reason)
 
     def register_conflict(self, a_id: str, b_id: str) -> Optional[Edge]:

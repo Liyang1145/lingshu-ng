@@ -4,6 +4,8 @@
 
 ## 未发布
 
+- 修复：protect/protect_node 的 node_id、reason 非 str 时抛 TypeError（对照上游 d56ab2b）。
+
 - 修复：add_edge condition_space 非 ConditionSpace、register_conflict 端点非 str 时 fail-loud（对照上游 e6724bc）。
 - 修复：激活抑制按 opposite 边 confidence 缩放并双向（低置信矛盾边不再满额否决，写序不再决定去留；对照上游 64e9020/d265fab）
 - 修复：decay_cycle 阈值值域、add_blindspot/protect_node 空标识/空理由、insight_verify level 类型 fail-loud（对照上游 d56ab2b）。
