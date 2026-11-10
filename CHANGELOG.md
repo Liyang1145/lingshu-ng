@@ -4,6 +4,8 @@
 
 ## 未发布
 
+- 修复：update_node_importance/confidence 拒收非有限/非实数 delta，get_skill_by_name 拒收非字符串（对照上游 e3087f7）
+
 - 修复：protect/protect_node 的 node_id、reason 非 str 时抛 TypeError（对照上游 d56ab2b）。
 
 - 修复：add_edge condition_space 非 ConditionSpace、register_conflict 端点非 str 时 fail-loud（对照上游 e6724bc）。

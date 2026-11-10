@@ -106,12 +106,16 @@ class LayeredStore:
 
     def update_node_confidence(self, node_id: str, delta: float) -> None:
         """旧 API ``update_node_confidence``：形状适配，规则委托 ng 组件。"""
+        if isinstance(delta, bool) or not isinstance(delta, (int, float)) or delta != delta or delta in (float("inf"), float("-inf")):
+            raise TypeError("delta 必须是有限实数")
         n = self.ng.nodes.get(node_id)
         if n is not None:
             self.ng.nodes.update(node_id, confidence=(n.confidence or 0.0) + delta, last_access=now())
 
     def update_node_importance(self, node_id: str, delta: float) -> None:
         """旧 API ``update_node_importance``：形状适配，规则委托 ng 组件。"""
+        if isinstance(delta, bool) or not isinstance(delta, (int, float)) or delta != delta or delta in (float("inf"), float("-inf")):
+            raise TypeError("delta 必须是有限实数")
         n = self.ng.nodes.get(node_id)
         if n is not None:
             self.ng.nodes.update(node_id, importance=(n.importance or 0.0) + delta)
@@ -324,6 +328,8 @@ class LayeredStore:
 
     def get_skill_by_name(self, name: str) -> Optional[Dict]:
         """按**精确名称**取技能卡，无同名返回 None（上游 #200）。ng 的精确名按规范化键比较（大小写/全半角/首尾空白不敏感）。"""
+        if not isinstance(name, str):
+            raise TypeError("name 必须是字符串")
         return self._skills.by_name(name)
 
     def count_skills(self) -> int:
