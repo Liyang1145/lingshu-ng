@@ -16,6 +16,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 import math
 from typing import Dict, List, Optional, Sequence, Tuple
@@ -83,6 +84,16 @@ def strip_export_controls(o):
     return o
 
 
+def refuse_hardlink(path: str) -> None:
+    """写前拒绝已存在且 nlink>1 的目标：就地写会作用在共享 inode（对照上游 139ffde）。"""
+    try:
+        st = os.stat(path)
+    except OSError:
+        return
+    if getattr(st, "st_nlink", 1) > 1:
+        raise ValueError(f"拒绝写入硬链接文件: {path}")
+
+
 def export_all(store: Store, output_path: str) -> Dict:
     """X1/X5：导出实际存在的 M13 表到 JSON。"""
     have = store.db.tables()
@@ -94,6 +105,7 @@ def export_all(store: Store, output_path: str) -> Dict:
     for t in TABLES:
         if t in have:
             data[t] = [r for r in _rows(store, t) if not _internal_meta(t, r)]
+    refuse_hardlink(output_path)
     with open(output_path, "w", encoding="utf-8") as f:
         json.dump(strip_export_controls(data), f, ensure_ascii=False, indent=2, allow_nan=False)
     return {"exported_nodes": len(data.get("nodes", [])), "path": output_path,

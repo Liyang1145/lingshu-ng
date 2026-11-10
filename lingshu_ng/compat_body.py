@@ -94,6 +94,7 @@ class BodyMixin:
         traj.setdefault("meta", {"exported_at": time.time(), "engine_version": "lingshu_ng",
                                  "condition_space": "轨迹导出 · 训练资产格式（有损投影）"})
         if output_path:
+            __import__('lingshu_ng.exchange', fromlist=['x']).refuse_hardlink(output_path)
             with open(output_path, "w", encoding="utf-8") as f:
                 json.dump(__import__('lingshu_ng.exchange',fromlist=['x']).strip_export_controls(traj), f, ensure_ascii=False, indent=2)
         return traj
