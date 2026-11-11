@@ -25,7 +25,7 @@ def require_finite(x: object, name: str = "value") -> float:
         raise ValueError(f"{name} 不能是布尔值: {x!r}")
     try:
         v = float(x)  # type: ignore[arg-type]
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         raise ValueError(f"{name} 必须是数值: {x!r}") from None
     if not math.isfinite(v):
         raise ValueError(f"{name} 必须是有限数值（拒收 NaN/inf）: {x!r}")

@@ -3,6 +3,8 @@
 版本号规则与弃用流程见 [docs/STABILITY_ng.md](docs/STABILITY_ng.md)；库结构升级 / 回滚见 [docs/UPGRADE.md](docs/UPGRADE.md)。
 
 ## 未发布
+
+- 大整数 float() 溢出归为 ValueError/默认值：numeric.require_finite、activation 置信度、compat_store 衰减参数（对照上游 4e3e045）。
 - 安全：export_all / export_trajectory 写前拒绝 nlink>1 的硬链接目标（对照上游 139ffde/bb29a04）。
 
 - 修复：update_node_importance/confidence 拒收非有限/非实数 delta，get_skill_by_name 拒收非字符串（对照上游 e3087f7）

@@ -250,7 +250,7 @@ class LayeredStore:
         「相同 Δt 下调用 1 次与 60 次结果相同」。首次进入时间模式按一个周期计；时钟回拨 dt 记 0。上次时刻存 engine_meta。"""
         try:
             _mc = float(min_confidence)
-        except (TypeError, ValueError) as exc:
+        except (TypeError, ValueError, OverflowError) as exc:
             raise TypeError("min_confidence 必须是实数，收到 %r" % (min_confidence,)) from exc
         if not math.isfinite(_mc) or not (0.0 <= _mc <= 1.0):
             raise ValueError("min_confidence 必须是 [0, 1] 内的有限值，收到 %r" % (min_confidence,))
@@ -264,7 +264,7 @@ class LayeredStore:
         last = self.ng.meta.get(LAST_DECAY_META_KEY).get(LAST_DECAY_META_KEY)
         try:
             dt = DECAY_PERIOD_SECONDS if last is None else max(0.0, t - float(last))
-        except (TypeError, ValueError):
+        except (TypeError, ValueError, OverflowError):
             _log.warning("engine_meta.%s 不是数值（%r）→ 按一个周期计", LAST_DECAY_META_KEY, last)
             dt = DECAY_PERIOD_SECONDS
         self.ng.meta.set(LAST_DECAY_META_KEY, repr(t))

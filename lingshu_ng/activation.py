@@ -56,7 +56,7 @@ DEFAULT_CONFIDENCE = 0.3          # 旧库缺 confidence 列/值时的兜底（�
 def _clamp_conf(c: Any) -> float:
     try:
         c = float(c)
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         return DEFAULT_CONFIDENCE
     if c != c:
         return DEFAULT_CONFIDENCE
