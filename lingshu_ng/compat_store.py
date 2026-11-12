@@ -50,6 +50,12 @@ def _pos_int(v: object, name: str) -> int:
     return v
 
 
+
+def _gate_id(fn, v):
+    if not isinstance(v, str) or not v.strip():
+        raise TypeError("%s 的 id 必须是非空字符串，收到 %r" % (fn, v))
+
+
 class LayeredStore:
     """旧 LayeredStore 的形状；内部是一个 ng :class:`Store`。"""
 
@@ -122,6 +128,7 @@ class LayeredStore:
 
     def increment_access(self, node_id: str) -> None:
         """旧 API ``increment_access``：形状适配，规则委托 ng 组件。"""
+        _gate_id("increment_access", node_id)
         self.ng.nodes.touch([node_id])
 
     def tag_node(self, node_id: str, tag: str) -> None:
@@ -167,6 +174,7 @@ class LayeredStore:
 
     def get_edge(self, edge_id: str) -> Optional[Edge]:
         """旧 API ``get_edge``：形状适配，规则委托 ng 组件。"""
+        _gate_id("get_edge", edge_id)
         return self.ng.edges.get(edge_id)
 
     def verify_edge(self, edge_id: str, new_confidence: Optional[float] = None) -> None:
@@ -175,15 +183,18 @@ class LayeredStore:
 
     def get_outgoing_edges(self, node_id: str) -> List[Edge]:
         """旧 API ``get_outgoing_edges``：形状适配，规则委托 ng 组件。"""
+        _gate_id("get_outgoing_edges", node_id)
         return self.ng.edges.outgoing(node_id)
 
     def get_incoming_edges(self, node_id: str) -> List[Edge]:
         """旧 API ``get_incoming_edges``：形状适配，规则委托 ng 组件。"""
+        _gate_id("get_incoming_edges", node_id)
         return self.ng.edges.incoming(node_id)
 
     def traverse(self, start_id: str, relation_types: Optional[List[str]] = None, direction: str = "out",
                  max_depth: int = 5, min_importance: float = 0.0, max_nodes: int = 500) -> List[Dict]:
         """旧 API ``traverse``：形状适配，规则委托 ng 组件。"""
+        _gate_id("traverse", start_id)
         return graphquery.traverse(self.ng, start_id, relation_types, direction, max_depth,
                                    min_importance, max_nodes)
 
@@ -492,6 +503,8 @@ class LayeredStore:
     def prune_self_snapshots(self, keep: int) -> int:
         """自我快照有界保留（上游 #201）：只留最近 ``keep`` 条，返回删除条数。ng 的快照在独立表 self_snapshots
         （不进 nodes、不参与召回，写入时已按 SNAPSHOT_KEEP 有界），本方法只动该表，SELF 节点与保护名单一律不动。"""
+        if isinstance(keep, bool) or not isinstance(keep, int):
+            raise TypeError("prune_self_snapshots 的 keep 必须是整数，收到 %r" % (keep,))
         k = int(keep)
         if k < 0:
             raise ValueError("keep 不能为负")

@@ -4,6 +4,7 @@
 
 ## 未发布
 
+- 兼容门面 get_edge/get_outgoing_edges/get_incoming_edges/traverse/increment_access 的 id 与 prune_self_snapshots 的 keep 加类型闸，错参 fail-loud（对照上游 8001322）。
 - 大整数 float() 溢出归为 ValueError/默认值：numeric.require_finite、activation 置信度、compat_store 衰减参数（对照上游 4e3e045）。
 - 安全：export_all / export_trajectory 写前拒绝 nlink>1 的硬链接目标（对照上游 139ffde/bb29a04）。
 
